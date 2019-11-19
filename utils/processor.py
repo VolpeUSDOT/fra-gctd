@@ -217,7 +217,7 @@ def process_video(
 
   if device_type == 'gpu':
     mapped_device_id = str(int(device_id) % physical_device_count)
-    # mapped_device_id = '0'
+    # mapped_device_id = '1'
     logging.debug('mapped logical device_id {} to physical device_id {}'.format(
       device_id, mapped_device_id))
 
@@ -354,7 +354,7 @@ def process_video(
     start = time()
 
     IO.write_inference_report(
-      video_file_name, output_dir_path, probability_array, class_name_map,
+      video_file_name, output_dir_path, probability_array, class_name_map, clip_length,
       smooth_probs=do_smooth_probs, smoothing_factor=smoothing_factor,
       binarize_probs=do_binarize_probs)
 
@@ -393,18 +393,55 @@ def process_video(
     # if timestamp_strings is not None:
     #   timestamp_strings = timestamp_strings.astype(np.int32)
 
-    trip = Trip(frame_numbers, None, None, probability_array,
-                class_name_map, non_event_weight_scale=1.0,
-                smooth_probs=do_smooth_probs, smoothing_factor=smoothing_factor)
+    trip = Trip(
+      frame_numbers, None, None, probability_array, class_name_map,
+      non_event_weight_scale=1.0, minimum_event_length=3,
+      smooth_probs=do_smooth_probs, smoothing_factor=smoothing_factor)
 
-    gate_activation_events = trip.find_gate_activation_events()
+    activation_events = trip.find_activation_events()
 
-    if len(gate_activation_events) > 0:
-      logging.info('{} events were found in {}'.format(
-        len(gate_activation_events), video_file_name))
+    if len(activation_events) > 0:
+      logging.info('{} activation events were found in {}'.format(
+        len(activation_events), video_file_name))
 
-      IO.write_event_report(
-        video_file_name, output_dir_path, gate_activation_events)
+      IO.write_activation_event_report(
+        video_file_name, output_dir_path, activation_events, clip_length)
+    else:
+      logging.info(
+        'No events were found in {}'.format(video_file_name))
+
+    stopped_on_crossing_incursion_events = trip.find_stopped_on_crossing_incursion_events()
+
+    if len(stopped_on_crossing_incursion_events) > 0:
+      logging.info('{} incursion events were found in {}'.format(
+        len(stopped_on_crossing_incursion_events), video_file_name))
+
+      IO.write_stopped_on_crossing_incursion_event_report(
+        video_file_name, output_dir_path, stopped_on_crossing_incursion_events, clip_length)
+    else:
+      logging.info(
+        'No events were found in {}'.format(video_file_name))
+
+    ped_right_of_way_incursion_events = trip.find_stopped_on_crossing_incursion_events()
+
+    if len(ped_right_of_way_incursion_events) > 0:
+      logging.info('{} incursion events were found in {}'.format(
+        len(ped_right_of_way_incursion_events), video_file_name))
+
+      IO.write_ped_right_of_way_incursion_event_report(
+        video_file_name, output_dir_path, ped_right_of_way_incursion_events, clip_length)
+    else:
+      logging.info(
+        'No events were found in {}'.format(video_file_name))
+
+    veh_right_of_way_incursion_events = trip.find_stopped_on_crossing_incursion_events()
+
+    if len(veh_right_of_way_incursion_events) > 0:
+      logging.info('{} incursion events were found in {}'.format(
+        len(veh_right_of_way_incursion_events), video_file_name))
+
+      IO.write_veh_right_of_way_incursion_event_report(
+        video_file_name, output_dir_path, veh_right_of_way_incursion_events, clip_length)
     else:
       logging.info(
         'No events were found in {}'.format(video_file_name))

@@ -146,7 +146,7 @@ def _does_contain_stopped_on_crossing_violation(classifications):
 # A vehicle is stopped in the dynamic envelope zone regardless of traffic or activation states.
 def _does_contain_vehicle_right_of_way_incursion_violation(classifications):
   vehicle_is_stopped_on_crossing = np.any(
-    classifications[[55, 58, 61, 64]])
+    classifications[[30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 63]])
   return vehicle_is_stopped_on_crossing
 
 # A vehicle is stopped in the dynamic envelope zone regardless of traffic or activation states.

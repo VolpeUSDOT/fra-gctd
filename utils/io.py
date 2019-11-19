@@ -268,7 +268,7 @@ class IO:
   @staticmethod
   def write_inference_report(
       report_file_name, report_dir_path, class_probs, class_name_map,
-      smooth_probs=False, smoothing_factor=0, binarize_probs=False):
+      clip_length, smooth_probs=False, smoothing_factor=0, binarize_probs=False):
     class_names = ['{}_probability'.format(class_name)
                    for class_name in class_name_map.values()]
 
@@ -289,10 +289,18 @@ class IO:
     #            qa_flags[i]] + ['{0:.4f}'.format(cls) for cls in class_probs[i]]
     #           for i in range(len(class_probs))]
     # else:
-    header = ['file_name', 'frame_number'] + class_names
-    rows = [[report_file_name, '{:d}'.format(i + 1)]
-            + ['{0:.4f}'.format(cls) for cls in class_probs[i]]
-            for i in range(len(class_probs))]
+    header = ['file_name', 'clip_number', 'start_time'] + class_names
+
+    rows = []
+
+    for i in range(len(class_probs)):
+      mins, secs = divmod(i * clip_length * 2 / 30, 60)
+      hours, minutes = divmod(mins, 60)
+
+      rows.append(
+        [report_file_name, '{:d}'.format(i + 1), '{:02d}:{:02d}:{:02d}'.format(
+          round(hours), round(mins), round(secs))]
+        + ['{0:.4f}'.format(cls) for cls in class_probs[i]])
 
     report_dir_path = path.join(report_dir_path, 'inference_reports')
 
@@ -306,8 +314,9 @@ class IO:
 
   # TODO: confirm that the csv can be opened after writing
   @staticmethod
-  def write_event_report(report_file_name, report_dir_path, events):
-    report_dir_path = path.join(report_dir_path, 'event_reports')
+  def write_activation_event_report(
+      report_file_name, report_dir_path, events, clip_length):
+    report_dir_path = path.join(report_dir_path, 'activation_reports')
 
     if not path.exists(report_dir_path):
       os.makedirs(report_dir_path)
@@ -316,39 +325,280 @@ class IO:
       report_dir_path, report_file_name + '.csv')
 
     header = [
-      'file_name', 'sequence_number', 'start_frame_number', 'end_frame_number', 
+      'file_name', 
+      'sequence_number', 
+      'start_clip_number', 
+      'end_clip_number',
+      'start_time',
+      'end_time',
       'nw_veh_warning_type_1', 
-      'nw_veh_warning_type_2', 'nw_veh_warning_type_3', 'nw_veh_warning_type_4',
-      'se_veh_warning_type_1', 'se_veh_warning_type_2', 'se_veh_warning_type_3',
-      'se_veh_warning_type_4', 'north_ped_warning_type_1', 
-      'north_ped_warning_type_2', 'north_ped_warning_type_3', 
-      'north_ped_warning_type_4', 'south_ped_warning_type_1', 
-      'south_ped_warning_type_2', 'south_ped_warning_type_3', 
-      'south_ped_warning_type_4', 'train_is_present'
+      'nw_veh_warning_type_2', 
+      'nw_veh_warning_type_3', 
+      'nw_veh_warning_type_4',
+      'se_veh_warning_type_1', 
+      'se_veh_warning_type_2', 
+      'se_veh_warning_type_3',
+      'se_veh_warning_type_4', 
+      'north_ped_warning_type_1', 
+      'north_ped_warning_type_2', 
+      'north_ped_warning_type_3', 
+      'north_ped_warning_type_4', 
+      'south_ped_warning_type_1', 
+      'south_ped_warning_type_2', 
+      'south_ped_warning_type_3', 
+      'south_ped_warning_type_4', 
+      'ped_arnd_se_ped_gate',
+      'ped_arnd_ne_ped_gate',
+      'ped_arnd_ne_veh_gate',
+      'ped_arnd_sw_ped_gate',
+      'ped_arnd_sw_veh_gate',
+      'ped_arnd_nw_ped_gate',
+      'ped_over_se_ped_gate',
+      'ped_over_ne_ped_gate',
+      'ped_over_ne_veh_gate',
+      'ped_over_sw_ped_gate',
+      'ped_over_sw_veh_gate',
+      'ped_over_nw_ped_gate',
+      'ped_undr_se_ped_gate',
+      'ped_undr_ne_ped_gate',
+      'ped_undr_ne_veh_gate',
+      'ped_undr_sw_ped_gate',
+      'ped_undr_sw_veh_gate',
+      'ped_undr_nw_ped_gate', 
+      'train_is_present'
     ]
 
-    rows = [[report_file_name, event.event_id + 1, event.start_frame_number,
-             event.end_frame_number,
-             event.contains_nw_veh_warning_type_1,
-            event.contains_nw_veh_warning_type_2,
-            event.contains_nw_veh_warning_type_3,
-            event.contains_nw_veh_warning_type_4,
-            event.contains_se_veh_warning_type_1,
-            event.contains_se_veh_warning_type_2,
-            event.contains_se_veh_warning_type_3,
-            event.contains_se_veh_warning_type_4,
+    rows = []
 
-            event.contains_north_ped_warning_type_1,
-            event.contains_north_ped_warning_type_2,
-            event.contains_north_ped_warning_type_3,
-            event.contains_north_ped_warning_type_4,
-            event.contains_south_ped_warning_type_1,
-            event.contains_south_ped_warning_type_2,
-            event.contains_south_ped_warning_type_3,
-            event.contains_south_ped_warning_type_4,
+    for event in events:
+      mins, secs = divmod(((event.start_clip_number + 1) * clip_length * 2 - 1) / 30, 60)
+      hours, minutes = divmod(mins, 60)
+      start_time = '{:02d}:{:02d}:{:02d}'.format(
+          round(hours), round(mins), round(secs))
 
-            event.train_is_present,
-            ]
-            for event in events]
+      mins, secs = divmod(((event.end_clip_number + 1) * clip_length * 2 - 1) / 30, 60)
+      hours, minutes = divmod(mins, 60)
+      end_time = '{:02d}:{:02d}:{:02d}'.format(
+          round(hours), round(mins), round(secs))
+
+      rows.append(
+        [report_file_name,
+         event.event_id + 1,
+         event.start_clip_number,
+         event.end_clip_number,
+         start_time,
+         end_time,
+         event.contains_nw_veh_warning_type_1,
+         event.contains_nw_veh_warning_type_2,
+         event.contains_nw_veh_warning_type_3,
+         event.contains_nw_veh_warning_type_4,
+         event.contains_se_veh_warning_type_1,
+         event.contains_se_veh_warning_type_2,
+         event.contains_se_veh_warning_type_3,
+         event.contains_se_veh_warning_type_4,
+         event.contains_north_ped_warning_type_1,
+         event.contains_north_ped_warning_type_2,
+         event.contains_north_ped_warning_type_3,
+         event.contains_north_ped_warning_type_4,
+         event.contains_south_ped_warning_type_1,
+         event.contains_south_ped_warning_type_2,
+         event.contains_south_ped_warning_type_3,
+         event.contains_south_ped_warning_type_4,
+         event.contains_ped_arnd_se_ped_gate,
+         event.contains_ped_arnd_ne_ped_gate,
+         event.contains_ped_arnd_ne_veh_gate,
+         event.contains_ped_arnd_sw_ped_gate,
+         event.contains_ped_arnd_sw_veh_gate,
+         event.contains_ped_arnd_nw_ped_gate,
+         event.contains_ped_over_se_ped_gate,
+         event.contains_ped_over_ne_ped_gate,
+         event.contains_ped_over_ne_veh_gate,
+         event.contains_ped_over_sw_ped_gate,
+         event.contains_ped_over_sw_veh_gate,
+         event.contains_ped_over_nw_ped_gate,
+         event.contains_ped_undr_se_ped_gate,
+         event.contains_ped_undr_ne_ped_gate,
+         event.contains_ped_undr_ne_veh_gate,
+         event.contains_ped_undr_sw_ped_gate,
+         event.contains_ped_undr_sw_veh_gate,
+         event.contains_ped_undr_nw_ped_gate,
+         event.train_is_present])
+
+    IO.write_csv(report_file_path, header, rows)
+
+  # TODO: confirm that the csv can be opened after writing
+  @staticmethod
+  def write_stopped_on_crossing_incursion_event_report(
+      report_file_name, report_dir_path, events, clip_length):
+    report_dir_path = path.join(
+      report_dir_path, 'stopped_on_crossing_incursion_reports')
+
+    if not path.exists(report_dir_path):
+      os.makedirs(report_dir_path)
+
+    report_file_path = path.join(
+      report_dir_path, report_file_name + '.csv')
+
+    header = [
+      'file_name', 
+      'sequence_number', 
+      'start_clip_number', 
+      'end_clip_number',
+      'start_time',
+      'end_time',
+      'veh_std_on_se_crsg',
+      'veh_std_on_ne_crsg',
+      'veh_std_on_sw_crsg',
+      'veh_std_on_nw_crsg',
+      'train_is_present'
+    ]
+
+    rows = []
+
+    for event in events:
+      mins, secs = divmod(((event.start_clip_number + 1) * clip_length * 2 - 1) / 30, 60)
+      hours, minutes = divmod(mins, 60)
+      start_time = '{:02d}:{:02d}:{:02d}'.format(
+          round(hours), round(mins), round(secs))
+
+      mins, secs = divmod(((event.end_clip_number + 1) * clip_length * 2 - 1) / 30, 60)
+      hours, minutes = divmod(mins, 60)
+      end_time = '{:02d}:{:02d}:{:02d}'.format(
+          round(hours), round(mins), round(secs))
+
+      rows.append(
+        [report_file_name, 
+         event.event_id + 1, 
+         event.start_clip_number,
+         event.end_clip_number,
+         start_time,
+         end_time,
+         event.contains_veh_std_on_se_crsg,
+         event.contains_veh_std_on_ne_crsg,
+         event.contains_veh_std_on_sw_crsg,
+         event.contains_veh_std_on_nw_crsg,
+         event.train_is_present])
+
+    IO.write_csv(report_file_path, header, rows)
+
+  # TODO: confirm that the csv can be opened after writing
+  @staticmethod
+  def write_ped_right_of_way_incursion_event_report(
+      report_file_name, report_dir_path, events, clip_length):
+    report_dir_path = path.join(
+      report_dir_path, 'ped_right_of_way_incursion_reports')
+
+    if not path.exists(report_dir_path):
+      os.makedirs(report_dir_path)
+
+    report_file_path = path.join(
+      report_dir_path, report_file_name + '.csv')
+
+    header = [
+      'file_name', 
+      'sequence_number', 
+      'start_clip_number', 
+      'end_clip_number',
+      'start_time',
+      'end_time',
+      'ped_on_sth_corr',
+      'ped_on_nth_corr', 
+      'train_is_present'
+    ]
+
+    rows = []
+
+    for event in events:
+      mins, secs = divmod(((event.start_clip_number + 1) * clip_length * 2 - 1) / 30, 60)
+      hours, minutes = divmod(mins, 60)
+      start_time = '{:02d}:{:02d}:{:02d}'.format(
+          round(hours), round(mins), round(secs))
+
+      mins, secs = divmod(((event.end_clip_number + 1) * clip_length * 2 - 1) / 30, 60)
+      hours, minutes = divmod(mins, 60)
+      end_time = '{:02d}:{:02d}:{:02d}'.format(
+          round(hours), round(mins), round(secs))
+
+      rows.append(
+        [report_file_name, 
+         event.event_id + 1, 
+         event.start_clip_number,
+         event.end_clip_number,
+         start_time,
+         end_time,
+         event.contains_ped_on_sth_corr,
+         event.contains_ped_on_nth_corr,
+         event.train_is_present])
+
+    IO.write_csv(report_file_path, header, rows)
+
+  # TODO: confirm that the csv can be opened after writing
+  @staticmethod
+  def write_veh_right_of_way_incursion_event_report(
+      report_file_name, report_dir_path, events, clip_length):
+    report_dir_path = path.join(
+      report_dir_path, 'veh_right_of_way_incursion_reports')
+
+    if not path.exists(report_dir_path):
+      os.makedirs(report_dir_path)
+
+    report_file_path = path.join(
+      report_dir_path, report_file_name + '.csv')
+
+    header = [
+      'file_name', 
+      'sequence_number', 
+      'start_clip_number', 
+      'end_clip_number', 
+      'start_time',
+      'end_time',
+      'veh_adv_on_se_corr',
+      'veh_adv_on_ne_corr',
+      'veh_adv_on_sw_corr',
+      'veh_adv_on_nw_corr',
+      'veh_rec_on_se_corr',
+      'veh_rec_on_ne_corr',
+      'veh_rec_on_sw_corr',
+      'veh_rec_on_nw_corr',
+      'veh_std_on_se_corr',
+      'veh_std_on_ne_corr',
+      'veh_std_on_sw_corr',
+      'veh_std_on_nw_corr', 
+      'train_is_present'
+    ]
+
+    rows = []
+
+    for event in events:
+      mins, secs = divmod(((event.start_clip_number + 1) * clip_length * 2 - 1) / 30, 60)
+      hours, minutes = divmod(mins, 60)
+      start_time = '{:02d}:{:02d}:{:02d}'.format(
+          round(hours), round(mins), round(secs))
+
+      mins, secs = divmod(((event.end_clip_number + 1) * clip_length * 2 - 1) / 30, 60)
+      hours, minutes = divmod(mins, 60)
+      end_time = '{:02d}:{:02d}:{:02d}'.format(
+          round(hours), round(mins), round(secs))
+
+      rows.append(
+        [report_file_name, 
+         event.event_id + 1, 
+         event.start_clip_number,
+         event.end_clip_number, 
+         start_time,
+         end_time,
+         event.contains_veh_adv_on_se_corr,
+         event.contains_veh_adv_on_ne_corr,
+         event.contains_veh_adv_on_sw_corr,
+         event.contains_veh_adv_on_nw_corr,
+         event.contains_veh_rec_on_se_corr,
+         event.contains_veh_rec_on_ne_corr,
+         event.contains_veh_rec_on_sw_corr,
+         event.contains_veh_rec_on_nw_corr,
+         event.contains_veh_std_on_se_corr,
+         event.contains_veh_std_on_ne_corr,
+         event.contains_veh_std_on_sw_corr,
+         event.contains_veh_std_on_nw_corr,
+         event.train_is_present])
 
     IO.write_csv(report_file_path, header, rows)
