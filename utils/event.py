@@ -631,7 +631,7 @@ class Trip:
     feature_sequence = []
     
     # extract features for use in finding gate activations
-    gate_light_states = self.report_probs[:, [1, 5]]
+    gate_light_states = self.report_probs[:, [2, 3, 4, 5]]
 
     if smooth_probs:
       gate_light_states = IO.smooth_probs(
@@ -642,8 +642,9 @@ class Trip:
 
     feature_id = 0
 
-    current_state = np.logical_and(
-        np.logical_not(gate_light_states[0, 0]), gate_light_states[0, 1])
+    current_state = np.logical_and(np.logical_or(np.logical_or(
+      gate_light_states[0, 0], gate_light_states[0, 1]),
+      gate_light_states[0, 2]), gate_light_states[0, 3])
 
     print('current_state: {}'.format(current_state))
 
@@ -657,8 +658,9 @@ class Trip:
     start_clip_number = report_frame_numbers[0]
 
     for i in range(1, len(gate_light_states)):
-      ith_gate_light_state = np.logical_and(
-        np.logical_not(gate_light_states[i, 0]), gate_light_states[i, 1])
+      ith_gate_light_state = np.logical_and(np.logical_or(np.logical_or(
+        gate_light_states[i, 0], gate_light_states[i, 1]),
+        gate_light_states[i, 2]), gate_light_states[i, 3])
       if ith_gate_light_state != current_state:
         if report_timestamps is not None:
           end_timestamp = report_timestamps[i - 1]
@@ -680,8 +682,9 @@ class Trip:
 
         feature_id += 1
 
-        current_state = np.logical_and(
-          np.logical_not(gate_light_states[i, 0]), gate_light_states[i, 1])
+        current_state = np.logical_and(np.logical_or(np.logical_or(
+          gate_light_states[i, 0], gate_light_states[i, 1]),
+          gate_light_states[i, 2]), gate_light_states[i, 3])
 
         if report_timestamps is not None:
           start_timestamp = report_timestamps[i]
