@@ -138,7 +138,7 @@ class IO:
 
   @staticmethod
   def read_report_header(
-      report_reader, frame_col_num=None, timestamp_col_num=None, qa_flag_col_num=None,
+      report_reader, clip_col_num=None, start_time_col_num=None,
       data_col_range=None, header_mask=None, return_data_col_range=False):
     if data_col_range is None and header_mask is None:
       raise ValueError('data_col_range and header_mask cannot both be None.')
@@ -147,18 +147,15 @@ class IO:
 
     report_header = []
     
-    if frame_col_num:
-      report_header.append(csv_header[frame_col_num])
+    if clip_col_num:
+      report_header.append(csv_header[clip_col_num])
     
-    if timestamp_col_num:
-      report_header.append(csv_header[timestamp_col_num])
-
-    if qa_flag_col_num:
-      report_header.append(csv_header[qa_flag_col_num])
+    if start_time_col_num:
+      report_header.append(csv_header[start_time_col_num])
         
     if len(report_header) == 0:
       raise ValueError(
-        'frame_col_num and timestamp_col_num cannot both be None.')
+        'clip_col_num and start_time_col_num cannot both be None.')
 
     if data_col_range is None:
       data_col_indices = [csv_header.index(data_col_name)
@@ -170,9 +167,9 @@ class IO:
     if header_mask and report_header != header_mask:
       raise ValueError(
         'report header: {} was expected to match header mask: {}\ngiven '
-        'frame_col_num: {}, timestamp_col_num: {} and data_col_range: '
-        '{}'.format(report_header, header_mask, frame_col_num, 
-                    timestamp_col_num, data_col_range))
+        'clip_col_num: {}, start_time_col_num: {} and data_col_range: '
+        '{}'.format(report_header, header_mask, clip_col_num, 
+                    start_time_col_num, data_col_range))
     
     if return_data_col_range:
       return report_header, data_col_range
@@ -180,41 +177,40 @@ class IO:
       return report_header
 
   @staticmethod
-  def read_report_data(
-      report_reader, frame_col_num=None, timestamp_col_num=None,
-      qa_flag_col_num=None, data_col_range=None):
-    if frame_col_num and timestamp_col_num and data_col_range:
-      frame_numbers = []
+  def read_report_data(report_reader, clip_col_num=None,
+                       start_time_col_num=None, data_col_range=None):
+    if clip_col_num and start_time_col_num and data_col_range:
+      clip_numbers = []
       timestamps = []
       probabilities = []
 
       for row in report_reader:
-        frame_numbers.append(row[frame_col_num])
-        timestamps.append(row[timestamp_col_num])
+        clip_numbers.append(row[clip_col_num])
+        timestamps.append(row[start_time_col_num])
         probabilities.append(row[data_col_range[0]:data_col_range[1]])
 
-      report_data = {'frame_numbers': np.array(frame_numbers),
-                     'frame_timestamps': np.array(timestamps),
+      report_data = {'clip_numbers': np.array(clip_numbers),
+                     'clip_timestamps': np.array(timestamps),
                      'probabilities': np.array(probabilities)}
-    elif frame_col_num and data_col_range:
-      frame_numbers = []
+    elif clip_col_num and data_col_range:
+      clip_numbers = []
       probabilities = []
 
       for row in report_reader:
-        frame_numbers.append(row[frame_col_num])
+        clip_numbers.append(row[clip_col_num])
         probabilities.append(row[data_col_range[0]:data_col_range[1]])
 
-      report_data = {'frame_numbers': np.array(frame_numbers),
+      report_data = {'clip_numbers': np.array(clip_numbers),
                      'probabilities': np.array(probabilities)}
-    elif timestamp_col_num and data_col_range:
+    elif start_time_col_num and data_col_range:
       timestamps = []
       probabilities = []
 
       for row in report_reader:
-        timestamps.append(row[timestamp_col_num])
+        timestamps.append(row[start_time_col_num])
         probabilities.append(row[data_col_range[0]:data_col_range[1]])
 
-      report_data = {'frame_timestamps': np.array(timestamps),
+      report_data = {'clip_timestamps': np.array(timestamps),
                      'probabilities': np.array(probabilities)}
     elif data_col_range:
       probabilities = []
@@ -229,27 +225,27 @@ class IO:
     return report_data
 
   @staticmethod
-  def read_report(report_file_path, frame_col_num=None, timestamp_col_num=None,
-                  qa_flag_col_num=None, data_col_range=None, header_mask=None,
+  def read_report(report_file_path, clip_col_num=None, start_time_col_num=None,
+                  data_col_range=None, header_mask=None,
                   return_data_col_range=False):
     report_reader = IO.open_report(report_file_path)
 
     if return_data_col_range:
       report_header, data_col_range = IO.read_report_header(
-        report_reader, frame_col_num=frame_col_num,
-        timestamp_col_num=timestamp_col_num, qa_flag_col_num=qa_flag_col_num,
+        report_reader, clip_col_num=clip_col_num,
+        start_time_col_num=start_time_col_num,
         data_col_range=data_col_range, header_mask=header_mask,
         return_data_col_range=True)
     else:
       report_header = IO.read_report_header(
-        report_reader, frame_col_num=frame_col_num,
-        timestamp_col_num=timestamp_col_num, qa_flag_col_num=qa_flag_col_num,
+        report_reader, clip_col_num=clip_col_num,
+        start_time_col_num=start_time_col_num,
         data_col_range=data_col_range, header_mask=header_mask,
         return_data_col_range=False)
 
     report_data = IO.read_report_data(
-      report_reader, frame_col_num=frame_col_num,
-      timestamp_col_num=timestamp_col_num, qa_flag_col_num=qa_flag_col_num,
+      report_reader, clip_col_num=clip_col_num,
+      start_time_col_num=start_time_col_num,
       data_col_range=data_col_range)
 
     if return_data_col_range:
@@ -283,7 +279,7 @@ class IO:
       class_probs = np.concatenate((class_probs, binarized_probs), axis=1)
 
     # if timestamp_strings is not None:
-    #   header = ['file_name', 'frame_number', 'frame_timestamp', 'qa_flag'] + \
+    #   header = ['file_name', 'clip_number', 'clip_timestamp', 'qa_flag'] + \
     #            class_names
     #   rows = [[report_file_name, '{:d}'.format(i + 1), timestamp_strings[i],
     #            qa_flags[i]] + ['{0:.4f}'.format(cls) for cls in class_probs[i]]
@@ -371,15 +367,13 @@ class IO:
     rows = []
 
     for event in events:
-      mins, secs = divmod(((event.start_clip_number + 1) * clip_length * 2 - 1) / 30, 60)
+      mins, secs = divmod((event.start_clip_number * clip_length * 2 - 1) / 30, 60)
       hours, minutes = divmod(mins, 60)
-      start_time = '{:02d}:{:02d}:{:02d}'.format(
-          round(hours), round(mins), round(secs))
+      start_time = '{:02d}:{:02d}:{:02d}'.format(int(hours), int(mins), int(secs))
 
-      mins, secs = divmod(((event.end_clip_number + 1) * clip_length * 2 - 1) / 30, 60)
+      mins, secs = divmod((event.end_clip_number * clip_length * 2 - 1) / 30, 60)
       hours, minutes = divmod(mins, 60)
-      end_time = '{:02d}:{:02d}:{:02d}'.format(
-          round(hours), round(mins), round(secs))
+      end_time = '{:02d}:{:02d}:{:02d}'.format(int(hours), int(mins), int(secs))
 
       rows.append(
         [report_file_name,
@@ -426,7 +420,7 @@ class IO:
 
     IO.write_csv(report_file_path, header, rows)
 
-  # TODO: confirm that the csv can be opened after writing
+    # TODO: confirm that the csv can be opened after writing
   @staticmethod
   def write_stopped_on_crossing_incursion_event_report(
       report_file_name, report_dir_path, events, clip_length):
