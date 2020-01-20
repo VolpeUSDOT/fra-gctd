@@ -10,7 +10,7 @@ from utils.event import Trip
 from utils.io import IO
 # from utils.timestamp import Timestamp
 
-os.putenv('CUDA_VISIBLE_DEVICES', '{}'.format(1))
+os.putenv('CUDA_VISIBLE_DEVICES', '1')
 
 path = os.path
 
@@ -382,11 +382,8 @@ def process_video(
   try:
     start = time()
 
-    # if do_smooth_probs:
-    #   smoothed_probability_array = IO.smooth_probs(
-    #     probability_array, smoothing_factor)
-    # else:
-    #   smoothed_probability_array = probability_array
+    if do_smooth_probs:
+      probability_array = IO.smooth_probs(probability_array, smoothing_factor)
 
     frame_numbers = [i + 1 for i in range(len(probability_array))]
 
@@ -394,9 +391,8 @@ def process_video(
     #   timestamp_strings = timestamp_strings.astype(np.int32)
 
     trip = Trip(
-      frame_numbers, None, None, probability_array, class_name_map,
-      non_event_weight_scale=1.0, minimum_event_length=3,
-      smooth_probs=do_smooth_probs, smoothing_factor=smoothing_factor)
+      frame_numbers, probability_array, class_name_map,
+      non_event_weight_scale=1.0, minimum_event_length=2)
 
     activation_events = trip.find_activation_events()
 

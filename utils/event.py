@@ -6,8 +6,7 @@ path = os.path
 
 
 class Feature:
-  def __init__(self, feature_id, state, start_timestamp,
-               end_timestamp, start_timestamp_qa_flag, end_timestamp_qa_flag,
+  def __init__(self, feature_id, class_id, class_name,
                start_clip_number, end_clip_number, event_id=None):
     """Create a new 'Feature' object.
     
@@ -15,22 +14,14 @@ class Feature:
       feature_id: The position of the feature in the source video relative to
         other features
       event_id: The id of the event to which this feature was assigned
-      current_state: The state of the activation (0 or 1)
-      start_timestamp: The timestamp extracted from the first frame in which the
-        feature occurred
-      end_timestamp: The timestamp extracted from the last frame in which the
-        feature occurred
       start_clip_number: The number of the first frame in which the feature
         occurred
       end_clip_number: The number of the last frame in which the feature
         occurred
     """
     self.feature_id = feature_id
-    self.state = state
-    self.start_timestamp = start_timestamp
-    self.end_timestamp = end_timestamp
-    self.start_timestamp_qa_flag = start_timestamp_qa_flag
-    self.end_timestamp_qa_flag = end_timestamp_qa_flag
+    self.class_id = class_id
+    self.class_name = class_name
     self.start_clip_number = start_clip_number
     self.end_clip_number = end_clip_number
     self.event_id = event_id
@@ -44,9 +35,8 @@ class Feature:
   def __str__(self):
     print_string = '\tfeature_id: ' + str(self.feature_id) + '\n'
     print_string += '\tevent_id: ' + str(self.event_id) + '\n'
-    print_string += '\tstate: ' + str(self.state) + '\n'
-    print_string += '\tstart_timestamp: ' + str(self.start_timestamp) + '\n'
-    print_string += '\tend_timestamp: ' + str(self.end_timestamp) + '\n'
+    print_string += '\tclass_id: ' + str(self.class_id) + '\n'
+    print_string += '\tclass_name: ' + str(self.class_name) + '\n'
     print_string += '\tstart_clip_number: ' + str(self.start_clip_number) + \
                     '\n'
     print_string += '\tend_clip_number: ' + str(self.end_clip_number) + '\n'
@@ -79,11 +69,16 @@ class ActivationEvent:
     for target_feature in self.target_feature_list:
       target_feature.event_id = self.event_id
 
-    self.start_timestamp = self.target_feature_list[0].start_timestamp
-    self.end_timestamp = self.target_feature_list[-1].end_timestamp
-
     self.start_clip_number = self.target_feature_list[0].start_clip_number
     self.end_clip_number = self.target_feature_list[-1].end_clip_number
+
+    if preceding_feature:
+      self.start_clip_number = preceding_feature.start_clip_number
+
+    if following_feature:
+      self.end_clip_number = following_feature.end_clip_number
+
+    self.length = self.end_clip_number - self.start_clip_number
 
     self.length = self.end_clip_number - self.start_clip_number
 
@@ -255,8 +250,6 @@ class ActivationEvent:
   @preceding_feature.setter
   def preceding_feature(self, preceding_feature):
     self._preceding_feature = preceding_feature
-    self.start_timestamp = self.preceding_feature.start_timestamp
-    self.start_clip_number = self.preceding_feature.start_clip_number
   
   @property  
   def following_feature(self):
@@ -268,10 +261,8 @@ class ActivationEvent:
     # if this event's following feature is being reassigned to a later event,
     # the 'following_feature' argument will be None
     if self.following_feature:
-      self.end_timestamp = self.following_feature.end_timestamp
       self.end_clip_number = self.following_feature.end_clip_number
     else:
-      self.end_timestamp = self.target_feature_list[-1].end_timestamp
       self.end_clip_number = self.target_feature_list[-1].end_clip_number
 
   def __str__(self):
@@ -314,9 +305,6 @@ class StoppedOnCrossingIncursionEvent:
     for target_feature in self.target_feature_list:
       target_feature.event_id = self.event_id
 
-    self.start_timestamp = self.target_feature_list[0].start_timestamp
-    self.end_timestamp = self.target_feature_list[-1].end_timestamp
-
     self.start_clip_number = self.target_feature_list[0].start_clip_number
     self.end_clip_number = self.target_feature_list[-1].end_clip_number
 
@@ -353,8 +341,8 @@ class StoppedOnCrossingIncursionEvent:
   @preceding_feature.setter
   def preceding_feature(self, preceding_feature):
     self._preceding_feature = preceding_feature
-    self.start_timestamp = self.preceding_feature.start_timestamp
-    self.start_clip_number = self.preceding_feature.start_clip_number
+    # self.start_timestamp = self.preceding_feature.start_timestamp
+    # self.start_clip_number = self.preceding_feature.start_clip_number
 
   @property
   def following_feature(self):
@@ -412,9 +400,6 @@ class VehicleRightOfWayIncursionEvent:
     for target_feature in self.target_feature_list:
       target_feature.event_id = self.event_id
 
-    self.start_timestamp = self.target_feature_list[0].start_timestamp
-    self.end_timestamp = self.target_feature_list[-1].end_timestamp
-
     self.start_clip_number = self.target_feature_list[0].start_clip_number
     self.end_clip_number = self.target_feature_list[-1].end_clip_number
 
@@ -467,7 +452,6 @@ class VehicleRightOfWayIncursionEvent:
   @preceding_feature.setter
   def preceding_feature(self, preceding_feature):
     self._preceding_feature = preceding_feature
-    self.start_timestamp = self.preceding_feature.start_timestamp
     self.start_clip_number = self.preceding_feature.start_clip_number
 
   @property
@@ -480,10 +464,8 @@ class VehicleRightOfWayIncursionEvent:
     # if this event's following feature is being reassigned to a later event,
     # the 'following_feature' argument will be None
     if self.following_feature:
-      self.end_timestamp = self.following_feature.end_timestamp
       self.end_clip_number = self.following_feature.end_clip_number
     else:
-      self.end_timestamp = self.target_feature_list[-1].end_timestamp
       self.end_clip_number = self.target_feature_list[-1].end_clip_number
 
   def __str__(self):
@@ -526,9 +508,6 @@ class PedestrianRightOfWayIncursionEvent:
     for target_feature in self.target_feature_list:
       target_feature.event_id = self.event_id
 
-    self.start_timestamp = self.target_feature_list[0].start_timestamp
-    self.end_timestamp = self.target_feature_list[-1].end_timestamp
-
     self.start_clip_number = self.target_feature_list[0].start_clip_number
     self.end_clip_number = self.target_feature_list[-1].end_clip_number
 
@@ -561,7 +540,6 @@ class PedestrianRightOfWayIncursionEvent:
   @preceding_feature.setter
   def preceding_feature(self, preceding_feature):
     self._preceding_feature = preceding_feature
-    self.start_timestamp = self.preceding_feature.start_timestamp
     self.start_clip_number = self.preceding_feature.start_clip_number
 
   @property
@@ -574,10 +552,8 @@ class PedestrianRightOfWayIncursionEvent:
     # if this event's following feature is being reassigned to a later event,
     # the 'following_feature' argument will be None
     if self.following_feature:
-      self.end_timestamp = self.following_feature.end_timestamp
       self.end_clip_number = self.following_feature.end_clip_number
     else:
-      self.end_timestamp = self.target_feature_list[-1].end_timestamp
       self.end_clip_number = self.target_feature_list[-1].end_clip_number
 
   def __str__(self):
@@ -597,187 +573,73 @@ class PedestrianRightOfWayIncursionEvent:
 
 
 class Trip:
-  def __init__(self, report_frame_numbers, report_timestamps, qa_flags,
+  def __init__(self, report_clip_numbers,
                report_probs, class_name_map, non_event_weight_scale=0.05,
-               minimum_event_length=1, smooth_probs=False, smoothing_factor=0):
+               minimum_event_length=1):
     self.class_names = class_name_map
     self.class_ids = {value: key for key, value in self.class_names.items()}
-    print('class_ids:\n{}'.format(self.class_ids))
 
-    self.report_probs = report_probs
+    report_class_ids = np.apply_along_axis(
+      func1d=self.feature_fn, axis=1, arr=report_probs)
 
-    self.activation_feature_sequence = self.get_activation_feature_sequence(
-      report_frame_numbers, report_timestamps, qa_flags, smooth_probs, 
-      smoothing_factor)
-
-    self.stopped_on_crossing_incursion_feature_sequence = self.get_stopped_on_crossing_incursion_feature_sequence(
-      report_frame_numbers, report_timestamps, qa_flags, smooth_probs, 
-      smoothing_factor)
-
-    self.veh_right_of_way_incursion_feature_sequence = self.get_veh_right_of_way_incursion_feature_sequence(
-      report_frame_numbers, report_timestamps, qa_flags, smooth_probs, 
-      smoothing_factor)
-
-    self.ped_right_of_way_incursion_feature_sequence = self.get_ped_right_of_way_incursion_feature_sequence(
-      report_frame_numbers, report_timestamps, qa_flags, smooth_probs, 
-      smoothing_factor)
-
-    self.weight_scale = non_event_weight_scale
-    self.minimum_event_length = minimum_event_length
-  
-  def get_activation_feature_sequence(
-      self, report_frame_numbers, report_timestamps, qa_flags, smooth_probs, 
-      smoothing_factor):
-    feature_sequence = []
-    
-    # extract features for use in finding gate activations
-    gate_light_states = self.report_probs[:, [2, 3, 4, 5]]
-
-    if smooth_probs:
-      gate_light_states = IO.smooth_probs(
-        gate_light_states, smoothing_factor)
-
-    gate_light_states = np.round(gate_light_states).astype(np.uint8)
-    print('gate_light_states:\n{}'.format(gate_light_states))
+    self.feature_sequence = []
 
     feature_id = 0
+    class_id = report_class_ids[0]
 
-    current_state = np.logical_and(np.logical_or(np.logical_or(
-      gate_light_states[0, 0], gate_light_states[0, 1]),
-      gate_light_states[0, 2]), gate_light_states[0, 3])
+    start_clip_number = report_clip_numbers[0]
 
-    print('current_state: {}'.format(current_state))
-
-    if report_timestamps is not None:
-      start_timestamp = report_timestamps[0]
-      start_timestamp_qa_flag = qa_flags[0]
-    else:
-      start_timestamp = None
-      start_timestamp_qa_flag = None
-
-    start_clip_number = report_frame_numbers[0]
-
-    for i in range(1, len(gate_light_states)):
-      ith_gate_light_state = np.logical_and(np.logical_or(np.logical_or(
-        gate_light_states[i, 0], gate_light_states[i, 1]),
-        gate_light_states[i, 2]), gate_light_states[i, 3])
-      if ith_gate_light_state != current_state:
-        if report_timestamps is not None:
-          end_timestamp = report_timestamps[i - 1]
-          end_timestamp_qa_flag = qa_flags[i - 1]
-        else:
-          end_timestamp = None
-          end_timestamp_qa_flag = None
-
-        end_clip_number = report_frame_numbers[i - 1]
-
-        print('current_state: {}'.format(current_state))
+    for i in range(1, len(report_class_ids)):
+      if report_class_ids[i] != class_id:
+        end_clip_number = report_clip_numbers[i - 1]
 
         # the beginning of the next feature has been reached.
         # create an object for the preceding feature.
-        feature_sequence.append(Feature(
-          feature_id, current_state, start_timestamp,
-          end_timestamp, start_timestamp_qa_flag, end_timestamp_qa_flag,
+        self.feature_sequence.append(Feature(
+          feature_id, class_id, self.class_names[class_id],
           start_clip_number, end_clip_number))
 
         feature_id += 1
 
-        current_state = np.logical_and(np.logical_or(np.logical_or(
-          gate_light_states[i, 0], gate_light_states[i, 1]),
-          gate_light_states[i, 2]), gate_light_states[i, 3])
+        class_id = report_class_ids[i]
 
-        if report_timestamps is not None:
-          start_timestamp = report_timestamps[i]
-          start_timestamp_qa_flag = qa_flags[i]
-        else:
-          start_timestamp = None
-          start_timestamp_qa_flag = None
+        start_clip_number = report_clip_numbers[i]
 
-        start_clip_number = report_frame_numbers[i]
-
-        if i == len(gate_light_states) - 1:
-          print('current_state: {}'.format(current_state))
-
-          feature_sequence.append(Feature(
-            feature_id, current_state, start_timestamp,
-            start_timestamp, start_timestamp_qa_flag, start_timestamp_qa_flag,
+        if i == len(report_class_ids) - 1:
+          self.feature_sequence.append(Feature(
+            feature_id, class_id, self.class_names[class_id],
             start_clip_number, start_clip_number))
-      elif i == len(gate_light_states) - 1:
-        if report_timestamps is not None:
-          end_timestamp = report_timestamps[i]
-          end_timestamp_qa_flag = qa_flags[i]
-        else:
-          end_timestamp = None
-          end_timestamp_qa_flag = None
+      elif i == len(report_class_ids) - 1:
+        end_clip_number = report_clip_numbers[i]
 
-        end_clip_number = report_frame_numbers[i]
-
-        print('current_state: {}'.format(current_state))
-
-        feature_sequence.append(Feature(
-          feature_id, current_state, start_timestamp,
-          end_timestamp, start_timestamp_qa_flag, end_timestamp_qa_flag,
+        self.feature_sequence.append(Feature(
+          feature_id, class_id, self.class_names[class_id],
           start_clip_number, end_clip_number))
-        
-    return feature_sequence
 
-  def find_activation_events(self):
-    events = []
+    self.weight_scale = non_event_weight_scale
+    self.minimum_event_length = minimum_event_length
 
-    event_id = 0
+  def feature_fn(self, clip_probs):
+    gates_ascending = self.class_ids['gates_ascending']
+    gates_descending = self.class_ids['gates_descending']
+    if clip_probs[gates_ascending] >= .25 \
+        and clip_probs[gates_ascending] > clip_probs[gates_descending]:
+      return gates_ascending
+    if clip_probs[gates_descending] >= .25 \
+        and clip_probs[gates_descending] > clip_probs[gates_ascending]:
+      return gates_descending
+    gates_down = self.class_ids['gates_down']
+    gates_up = self.class_ids['gates_up']
+    if clip_probs[gates_descending] < .25 \
+        and clip_probs[gates_ascending] < .25 \
+        and clip_probs[gates_down] >= .6 \
+        and clip_probs[gates_up] < clip_probs[gates_down] / 3:
+      return gates_down
+    else:
+      return gates_up
 
-    i = 0
-
-    weight = 0.0
-
-    while i < len(self.activation_feature_sequence):
-      current_feature = self.activation_feature_sequence[i]
-      i += 1
-      if current_feature.state:
-        target_feature_list = [current_feature]
-        longest_target_feature_gap = 0
-        weight += current_feature.length
-
-        while i < len(self.activation_feature_sequence):
-          current_feature = self.activation_feature_sequence[i]
-          i += 1
-          if current_feature.state:
-            current_feature_gap = current_feature.start_clip_number - \
-                    target_feature_list[-1].end_clip_number
-            if longest_target_feature_gap < current_feature_gap:
-              longest_target_feature_gap = current_feature_gap
-
-            target_feature_list.append(current_feature)
-            weight += current_feature.length
-          else:
-            weight -= self.weight_scale * current_feature.length
-
-          if weight <= 0:
-            break
-
-        current_event = ActivationEvent(event_id=event_id,
-                              target_feature_list=target_feature_list)
-
-        weight = 0
-
-        if current_event.length >= self.minimum_event_length:
-          events.append(current_event)
-          event_id += 1
-
-    for event in events:
-      print('start_clip_number', event.start_clip_number)
-      print('end_clip_number', event.end_clip_number)
-      classifications = np.round(
-        self.report_probs[event.start_clip_number - 1:event.end_clip_number]
-      ).astype(np.uint8)
-      print('classifications', classifications)
-
-      event.find_violations(classifications)
-
-    return events
-  
   def get_stopped_on_crossing_incursion_feature_sequence(
-      self, report_frame_numbers, report_timestamps, qa_flags, smooth_probs, 
+      self, report_clip_numbers, smooth_probs,
       smoothing_factor):
     feature_sequence = []
     
@@ -789,79 +651,43 @@ class Trip:
         incursion_states, smoothing_factor)
 
     incursion_states = np.round(incursion_states).astype(np.uint8)
-    print('incursion_states:\n{}'.format(incursion_states))
 
     feature_id = 0
 
     current_state = np.any(incursion_states[0])
 
-    print('current_state: {}'.format(current_state))
-
-    if report_timestamps is not None:
-      start_timestamp = report_timestamps[0]
-      start_timestamp_qa_flag = qa_flags[0]
-    else:
-      start_timestamp = None
-      start_timestamp_qa_flag = None
-
-    start_clip_number = report_frame_numbers[0]
+    start_clip_number = report_clip_numbers[0]
 
     for i in range(1, len(incursion_states)):
       ith_gate_light_state = np.any(incursion_states[i])
       if ith_gate_light_state != current_state:
-        if report_timestamps is not None:
-          end_timestamp = report_timestamps[i - 1]
-          end_timestamp_qa_flag = qa_flags[i - 1]
-        else:
-          end_timestamp = None
-          end_timestamp_qa_flag = None
-
-        end_clip_number = report_frame_numbers[i - 1]
-
-        print('current_state: {}'.format(current_state))
+        end_clip_number = report_clip_numbers[i - 1]
 
         # the beginning of the next feature has been reached.
         # create an object for the preceding feature.
         feature_sequence.append(Feature(
-          feature_id, current_state, start_timestamp,
-          end_timestamp, start_timestamp_qa_flag, end_timestamp_qa_flag,
+          feature_id, current_state,
           start_clip_number, end_clip_number))
 
         feature_id += 1
 
         current_state = np.any(incursion_states[i])
 
-        if report_timestamps is not None:
-          start_timestamp = report_timestamps[i]
-          start_timestamp_qa_flag = qa_flags[i]
-        else:
-          start_timestamp = None
-          start_timestamp_qa_flag = None
-
-        start_clip_number = report_frame_numbers[i]
+        start_clip_number = report_clip_numbers[i]
 
         if i == len(incursion_states) - 1:
           print('current_state: {}'.format(current_state))
 
           feature_sequence.append(Feature(
-            feature_id, current_state, start_timestamp,
-            start_timestamp, start_timestamp_qa_flag, start_timestamp_qa_flag,
+            feature_id, current_state,
             start_clip_number, start_clip_number))
       elif i == len(incursion_states) - 1:
-        if report_timestamps is not None:
-          end_timestamp = report_timestamps[i]
-          end_timestamp_qa_flag = qa_flags[i]
-        else:
-          end_timestamp = None
-          end_timestamp_qa_flag = None
-
-        end_clip_number = report_frame_numbers[i]
+        end_clip_number = report_clip_numbers[i]
 
         print('current_state: {}'.format(current_state))
 
         feature_sequence.append(Feature(
-          feature_id, current_state, start_timestamp,
-          end_timestamp, start_timestamp_qa_flag, end_timestamp_qa_flag,
+          feature_id, current_state,
           start_clip_number, end_clip_number))
 
     return feature_sequence
@@ -922,7 +748,7 @@ class Trip:
     return events
   
   def get_ped_right_of_way_incursion_feature_sequence(
-      self, report_frame_numbers, report_timestamps, qa_flags, smooth_probs, 
+      self, report_clip_numbers, smooth_probs,
       smoothing_factor):
     feature_sequence = []
     
@@ -934,79 +760,45 @@ class Trip:
         incursion_states, smoothing_factor)
 
     incursion_states = np.round(incursion_states).astype(np.uint8)
-    print('incursion_states:\n{}'.format(incursion_states))
 
     feature_id = 0
 
     current_state = np.any(incursion_states[0])
 
-    print('current_state: {}'.format(current_state))
-
-    if report_timestamps is not None:
-      start_timestamp = report_timestamps[0]
-      start_timestamp_qa_flag = qa_flags[0]
-    else:
-      start_timestamp = None
-      start_timestamp_qa_flag = None
-
-    start_clip_number = report_frame_numbers[0]
+    start_clip_number = report_clip_numbers[0]
 
     for i in range(1, len(incursion_states)):
       ith_gate_light_state = np.any(incursion_states[i])
       if ith_gate_light_state != current_state:
-        if report_timestamps is not None:
-          end_timestamp = report_timestamps[i - 1]
-          end_timestamp_qa_flag = qa_flags[i - 1]
-        else:
-          end_timestamp = None
-          end_timestamp_qa_flag = None
-
-        end_clip_number = report_frame_numbers[i - 1]
+        end_clip_number = report_clip_numbers[i - 1]
 
         print('current_state: {}'.format(current_state))
 
         # the beginning of the next feature has been reached.
         # create an object for the preceding feature.
         feature_sequence.append(Feature(
-          feature_id, current_state, start_timestamp,
-          end_timestamp, start_timestamp_qa_flag, end_timestamp_qa_flag,
+          feature_id, current_state,
           start_clip_number, end_clip_number))
 
         feature_id += 1
 
         current_state = np.any(incursion_states[i])
 
-        if report_timestamps is not None:
-          start_timestamp = report_timestamps[i]
-          start_timestamp_qa_flag = qa_flags[i]
-        else:
-          start_timestamp = None
-          start_timestamp_qa_flag = None
-
-        start_clip_number = report_frame_numbers[i]
+        start_clip_number = report_clip_numbers[i]
 
         if i == len(incursion_states) - 1:
           print('current_state: {}'.format(current_state))
 
           feature_sequence.append(Feature(
-            feature_id, current_state, start_timestamp,
-            start_timestamp, start_timestamp_qa_flag, start_timestamp_qa_flag,
+            feature_id, current_state,
             start_clip_number, start_clip_number))
       elif i == len(incursion_states) - 1:
-        if report_timestamps is not None:
-          end_timestamp = report_timestamps[i]
-          end_timestamp_qa_flag = qa_flags[i]
-        else:
-          end_timestamp = None
-          end_timestamp_qa_flag = None
-
-        end_clip_number = report_frame_numbers[i]
+        end_clip_number = report_clip_numbers[i]
 
         print('current_state: {}'.format(current_state))
 
         feature_sequence.append(Feature(
-          feature_id, current_state, start_timestamp,
-          end_timestamp, start_timestamp_qa_flag, end_timestamp_qa_flag,
+          feature_id, current_state,
           start_clip_number, end_clip_number))
 
     return feature_sequence
@@ -1067,7 +859,7 @@ class Trip:
     return events
   
   def get_veh_right_of_way_incursion_feature_sequence(
-      self, report_frame_numbers, report_timestamps, qa_flags, smooth_probs, 
+      self, report_clip_numbers, smooth_probs,
       smoothing_factor):
     feature_sequence = []
     
@@ -1079,79 +871,41 @@ class Trip:
         incursion_states, smoothing_factor)
 
     incursion_states = np.round(incursion_states).astype(np.uint8)
-    print('incursion_states:\n{}'.format(incursion_states))
 
     feature_id = 0
 
     current_state = np.any(incursion_states[0])
 
-    print('current_state: {}'.format(current_state))
-
-    if report_timestamps is not None:
-      start_timestamp = report_timestamps[0]
-      start_timestamp_qa_flag = qa_flags[0]
-    else:
-      start_timestamp = None
-      start_timestamp_qa_flag = None
-
-    start_clip_number = report_frame_numbers[0]
+    start_clip_number = report_clip_numbers[0]
 
     for i in range(1, len(incursion_states)):
       ith_gate_light_state = np.any(incursion_states[i])
       if ith_gate_light_state != current_state:
-        if report_timestamps is not None:
-          end_timestamp = report_timestamps[i - 1]
-          end_timestamp_qa_flag = qa_flags[i - 1]
-        else:
-          end_timestamp = None
-          end_timestamp_qa_flag = None
-
-        end_clip_number = report_frame_numbers[i - 1]
+        end_clip_number = report_clip_numbers[i - 1]
 
         print('current_state: {}'.format(current_state))
 
         # the beginning of the next feature has been reached.
         # create an object for the preceding feature.
         feature_sequence.append(Feature(
-          feature_id, current_state, start_timestamp,
-          end_timestamp, start_timestamp_qa_flag, end_timestamp_qa_flag,
+          feature_id, current_state,
           start_clip_number, end_clip_number))
 
         feature_id += 1
 
         current_state = np.any(incursion_states[i])
 
-        if report_timestamps is not None:
-          start_timestamp = report_timestamps[i]
-          start_timestamp_qa_flag = qa_flags[i]
-        else:
-          start_timestamp = None
-          start_timestamp_qa_flag = None
-
-        start_clip_number = report_frame_numbers[i]
+        start_clip_number = report_clip_numbers[i]
 
         if i == len(incursion_states) - 1:
-          print('current_state: {}'.format(current_state))
-
           feature_sequence.append(Feature(
-            feature_id, current_state, start_timestamp,
-            start_timestamp, start_timestamp_qa_flag, start_timestamp_qa_flag,
+            feature_id, current_state,
             start_clip_number, start_clip_number))
       elif i == len(incursion_states) - 1:
-        if report_timestamps is not None:
-          end_timestamp = report_timestamps[i]
-          end_timestamp_qa_flag = qa_flags[i]
-        else:
-          end_timestamp = None
-          end_timestamp_qa_flag = None
-
-        end_clip_number = report_frame_numbers[i]
-
-        print('current_state: {}'.format(current_state))
+        end_clip_number = report_clip_numbers[i]
 
         feature_sequence.append(Feature(
-          feature_id, current_state, start_timestamp,
-          end_timestamp, start_timestamp_qa_flag, end_timestamp_qa_flag,
+          feature_id, current_state,
           start_clip_number, end_clip_number))
         
     return feature_sequence
@@ -1200,18 +954,255 @@ class Trip:
           event_id += 1
 
     for event in events:
-      print('start_clip_number', event.start_clip_number)
-      print('end_clip_number', event.end_clip_number)
       classifications = np.round(
         self.report_probs[event.start_clip_number - 1:event.end_clip_number]
       ).astype(np.uint8)
-      print('classifications', classifications)
 
       event.find_violations(classifications)
 
     return events
 
 
+  def find_events(
+      self, target_feature_class_ids, target_feature_class_names=None,
+      preceding_feature_class_id=None, preceding_feature_class_name=None,
+      following_feature_class_id=None, following_feature_class_name=None):
+    if target_feature_class_ids is None:
+      if target_feature_class_names is None:
+        raise ValueError('target_feature_class_ids and target_'
+                         'feature_class_names cannot both be None')
+      else:
+        target_feature_class_ids = [self.class_ids[name]
+                                    for name in target_feature_class_names]
+
+    if preceding_feature_class_id is None and \
+            preceding_feature_class_name is not None:
+      preceding_feature_class_id = self.class_ids[preceding_feature_class_name]
+
+    if preceding_feature_class_id in target_feature_class_ids:
+      raise ValueError('preceding_feature_class_id cannot be equal to any '
+                       'target_feature_class_id')
+
+    if following_feature_class_id is None and \
+            following_feature_class_name is not None:
+      following_feature_class_id = self.class_ids[following_feature_class_name]
+
+    if following_feature_class_id in target_feature_class_ids:
+      raise ValueError('following_feature_class_id cannot be equal to any '
+                       'target_feature_class_id')
+
+    events = []
+
+    previous_event = None
+
+    event_id = 0
+
+    i = 0
+
+    weight = 0.0
+
+    if preceding_feature_class_id and following_feature_class_id:
+      previous_preceding_feature = None
+      previous_following_feature = None
+
+      while i < len(self.feature_sequence):
+        current_feature = self.feature_sequence[i]
+        i += 1
+        if current_feature.class_id in target_feature_class_ids:
+          target_feature_list = [current_feature]
+          longest_target_feature_gap = 0
+          weight += current_feature.length
+
+          while i < len(self.feature_sequence) and current_feature.class_id \
+              not in [preceding_feature_class_id, following_feature_class_id]:
+            current_feature = self.feature_sequence[i]
+            i += 1
+            if current_feature.class_id in target_feature_class_ids:
+              current_feature_gap = current_feature.start_clip_number - \
+                      target_feature_list[-1].end_clip_number
+              if longest_target_feature_gap < current_feature_gap:
+                longest_target_feature_gap = current_feature_gap
+
+              target_feature_list.append(current_feature)
+              weight += current_feature.length
+            else:
+              weight -= self.weight_scale * current_feature.length
+
+            if weight <= 0:
+              break
+
+          # if a detected event begins or ends in a frame from which the timestamp
+          # could not be read or syntehsized, just ignore the event.
+          # if target_feature_list[0].start_timestamp != -1 \
+          #     or target_feature_list[-1].end_timestamp != -1:
+          current_event = ActivationEvent(
+            event_id=event_id, target_feature_list=target_feature_list,
+            preceding_feature=previous_preceding_feature)
+
+          if current_event.length >= self.minimum_event_length:
+            weight = 0
+
+            # if two consecutive events share a common following/preceding
+            # feature, and that feature is closer to the current event than the
+            # previous event, reassign it to the current event.
+            if previous_preceding_feature:
+              if current_event.start_clip_number - \
+                  previous_preceding_feature.end_clip_number < \
+                  longest_target_feature_gap * 10:
+                if previous_preceding_feature.event_id:
+                  previous_target_feature = events[
+                    previous_preceding_feature.event_id].target_feature_list[-1]
+
+                  previous_target_feature_distance = \
+                    previous_preceding_feature.start_clip_number - \
+                    previous_target_feature.end_clip_number
+
+                  assert previous_target_feature_distance >= 0
+
+                  current_feature_distance = \
+                    current_event.target_feature_list[0].start_clip_number - \
+                    previous_preceding_feature.end_clip_number
+
+                  assert current_feature_distance >= 0
+
+                  if current_feature_distance < previous_target_feature_distance:
+                    previous_event.following_feature = None
+                    current_event.preceding_feature = previous_preceding_feature
+                    previous_preceding_feature.event_id = event_id
+                else:
+                  current_event.preceding_feature = previous_preceding_feature
+                  previous_preceding_feature.event_id = event_id
+
+                if previous_preceding_feature == previous_following_feature:
+                  previous_following_feature = None
+
+                previous_preceding_feature = None
+
+            events.append(current_event)
+            event_id += 1
+            previous_event = current_event
+
+        if current_feature.class_id == preceding_feature_class_id:
+          previous_preceding_feature = current_feature
+
+        if current_feature.class_id == following_feature_class_id:
+          previous_following_feature = current_feature
+
+          if previous_event and \
+                  previous_event.following_feature is None:
+            previous_event.following_feature = previous_following_feature
+            previous_following_feature.event_id = previous_event.event_id
+            previous_following_feature = None
+    elif not preceding_feature_class_id and following_feature_class_id:
+      while i < len(self.feature_sequence):
+        current_feature = self.feature_sequence[i]
+        i += 1
+        if current_feature.class_id in target_feature_class_ids:
+          target_feature_list = [current_feature]
+
+          while i < len(self.feature_sequence) \
+              and current_feature.class_id != following_feature_class_id:
+            current_feature = self.feature_sequence[i]
+            i += 1
+            if current_feature.class_id in target_feature_class_ids:
+              target_feature_list.append(current_feature)
+
+          current_event = ActivationEvent(
+              event_id=event_id, target_feature_list=target_feature_list)
+
+          if current_event.length >= self.minimum_event_length:
+            events.append(current_event)
+            event_id += 1
+            previous_event = current_event
+
+        if current_feature.class_id == following_feature_class_id:
+          previous_following_feature = current_feature
+
+          if previous_event and \
+                  previous_event.following_feature is None:
+            previous_event.following_feature = previous_following_feature
+            previous_following_feature.event_id = previous_event.event_id
+    elif preceding_feature_class_id and not following_feature_class_id:
+      previous_preceding_feature = None
+
+      while i < len(self.feature_sequence):
+        current_feature = self.feature_sequence[i]
+        i += 1
+
+        if current_feature.class_id in target_feature_class_ids:
+          target_feature_list = [current_feature]
+
+          while i < len(self.feature_sequence) \
+              and current_feature.class_id != preceding_feature_class_id:
+            current_feature = self.feature_sequence[i]
+            i += 1
+
+            if current_feature.class_id in target_feature_class_ids:
+              target_feature_list.append(current_feature)
+
+          current_event = ActivationEvent(
+              event_id=event_id, target_feature_list=target_feature_list)
+
+          # if two consecutive events share a common following/preceding
+          # feature, and that feature is closer to the current event than the
+          # previous event, reassign it to the current event.
+          if previous_preceding_feature:
+            current_event.preceding_feature = previous_preceding_feature
+            previous_preceding_feature.event_id = event_id
+            previous_preceding_feature = None
+
+          if current_event.length >= self.minimum_event_length:
+            events.append(current_event)
+            event_id += 1
+
+        if current_feature.class_id == preceding_feature_class_id:
+          previous_preceding_feature = current_feature
+    else:
+      while i < len(self.feature_sequence):
+        current_feature = self.feature_sequence[i]
+        i += 1
+        if current_feature.class_id in target_feature_class_ids:
+          target_feature_list = [current_feature]
+          longest_target_feature_gap = 0
+          weight += current_feature.length
+
+          while i < len(self.feature_sequence):
+            current_feature = self.feature_sequence[i]
+            i += 1
+            if current_feature.class_id in target_feature_class_ids:
+              current_feature_gap = current_feature.start_clip_number - \
+                      target_feature_list[-1].end_clip_number
+              if longest_target_feature_gap < current_feature_gap:
+                longest_target_feature_gap = current_feature_gap
+
+              target_feature_list.append(current_feature)
+              weight += current_feature.length
+            else:
+              weight -= self.weight_scale * current_feature.length
+
+            if weight <= 0:
+              break
+
+          current_event = ActivationEvent(
+              event_id=event_id, target_feature_list=target_feature_list)
+
+          weight = 0
+
+          if current_event.length >= self.minimum_event_length:
+            events.append(current_event)
+            event_id += 1
+
+    return events
+
+  def find_activation_events(self):
+    return self.find_events(
+      target_feature_class_ids=[self.class_ids['gates_down']],
+      target_feature_class_names=['gates_down'],
+      preceding_feature_class_id=self.class_ids['gates_descending'],
+      preceding_feature_class_name='gates_descending',
+      following_feature_class_id=self.class_ids['gates_ascending'],
+      following_feature_class_name='gates_ascending'
+    )
 
 class TripFromReportFile(Trip):
   def __init__(self, report_file_path, class_names_file_path,
@@ -1221,23 +1212,15 @@ class TripFromReportFile(Trip):
     class_header_names = [class_name + '_probability'
                           for class_name in class_name_map.values()]
 
-    header_mask = ['frame_number', 'frame_timestamp', 'qa_flag']
+    header_mask = ['clip_number', 'start_time']
     header_mask.extend(class_header_names)
 
     report_header, report_data, data_col_range = IO.read_report(
-      report_file_path, frame_col_num=1, timestamp_col_num=2, qa_flag_col_num=3,
+      report_file_path, clip_col_num=1, start_time_col_num=2,
       header_mask=header_mask, return_data_col_range=True)
 
-    report_frame_numbers = report_data['frame_numbers']
-    report_frame_numbers = report_frame_numbers.astype(np.int32)
-
-    try:
-      report_timestamps = report_data['frame_timestamps']
-      report_timestamps = report_timestamps.astype(np.int32)
-      qa_flags = report_data['qa_flag']
-    except:
-      report_timestamps = None
-      qa_flags = None
+    report_clip_numbers = report_data['clip_numbers']
+    report_clip_numbers = report_clip_numbers.astype(np.int32)
 
     report_probs = report_data['probabilities']
     report_probs = report_probs.astype(np.float32)
@@ -1245,5 +1228,4 @@ class TripFromReportFile(Trip):
     if smooth_probs:
       report_probs = IO.smooth_probs(report_probs, smoothing_factor)
 
-    Trip.__init__(self, report_frame_numbers, report_timestamps, qa_flags,
-                  report_probs, class_name_map)
+    Trip.__init__(self, report_clip_numbers, report_probs, class_name_map)
