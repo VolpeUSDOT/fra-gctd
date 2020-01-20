@@ -420,7 +420,107 @@ class IO:
 
     IO.write_csv(report_file_path, header, rows)
 
-    # TODO: confirm that the csv can be opened after writing
+  # TODO: confirm that the csv can be opened after writing
+  @staticmethod
+  def write_aggregated_activation_event_report(
+      report_file_name, report_dir_path, events, clip_length):
+    report_dir_path = path.join(report_dir_path, 'activation_reports')
+
+    if not path.exists(report_dir_path):
+      os.makedirs(report_dir_path)
+
+    report_file_path = path.join(
+      report_dir_path, report_file_name + '.csv')
+
+    header = [
+      'file_name',
+      'sequence_number',
+      'start_clip_number',
+      'end_clip_number',
+      'start_time',
+      'end_time',
+      'nw_veh_warning_type_1',
+      'nw_veh_warning_type_2',
+      'nw_veh_warning_type_3',
+      'nw_veh_warning_type_4',
+      'se_veh_warning_type_1',
+      'se_veh_warning_type_2',
+      'se_veh_warning_type_3',
+      'se_veh_warning_type_4',
+      'north_ped_warning_type_1',
+      'north_ped_warning_type_2',
+      'north_ped_warning_type_3',
+      'north_ped_warning_type_4',
+      'south_ped_warning_type_1',
+      'south_ped_warning_type_2',
+      'south_ped_warning_type_3',
+      'south_ped_warning_type_4',
+      'ped_arnd_ped_gate',
+      'ped_arnd_veh_gate',
+      'ped_over_ped_gate',
+      'ped_over_veh_gate',
+      'ped_undr_ped_gate',
+      'ped_undr_veh_gate'
+    ]
+
+    rows = []
+
+    for event in events:
+      mins, secs = divmod((event.start_clip_number * clip_length * 2 - 1) / 30, 60)
+      hours, minutes = divmod(mins, 60)
+      start_time = '{:02d}:{:02d}:{:02d}'.format(
+          int(hours), int(mins), int(secs))
+
+      mins, secs = divmod((event.end_clip_number * clip_length * 2 - 1) / 30, 60)
+      hours, minutes = divmod(mins, 60)
+      end_time = '{:02d}:{:02d}:{:02d}'.format(
+          int(hours), int(mins), int(secs))
+
+      rows.append(
+        [report_file_name,
+         event.event_id + 1,
+         event.start_clip_number,
+         event.end_clip_number,
+         start_time,
+         end_time,
+         event.contains_nw_veh_warning_type_1,
+         event.contains_nw_veh_warning_type_2,
+         event.contains_nw_veh_warning_type_3,
+         event.contains_nw_veh_warning_type_4,
+         event.contains_se_veh_warning_type_1,
+         event.contains_se_veh_warning_type_2,
+         event.contains_se_veh_warning_type_3,
+         event.contains_se_veh_warning_type_4,
+         event.contains_north_ped_warning_type_1,
+         event.contains_north_ped_warning_type_2,
+         event.contains_north_ped_warning_type_3,
+         event.contains_north_ped_warning_type_4,
+         event.contains_south_ped_warning_type_1,
+         event.contains_south_ped_warning_type_2,
+         event.contains_south_ped_warning_type_3,
+         event.contains_south_ped_warning_type_4,
+         int(event.contains_ped_arnd_se_ped_gate)
+         + int(event.contains_ped_arnd_ne_ped_gate)
+         + int(event.contains_ped_arnd_sw_ped_gate)
+         + int(event.contains_ped_arnd_nw_ped_gate),
+         int(event.contains_ped_arnd_ne_veh_gate)
+         + int(event.contains_ped_arnd_sw_veh_gate),
+         int(event.contains_ped_over_se_ped_gate)
+         + int(event.contains_ped_over_ne_ped_gate)
+         + int(event.contains_ped_over_sw_ped_gate)
+         + int(event.contains_ped_over_nw_ped_gate),
+         int(event.contains_ped_over_ne_veh_gate)
+         + int(event.contains_ped_over_sw_veh_gate),
+         int(event.contains_ped_undr_se_ped_gate)
+         + int(event.contains_ped_undr_ne_ped_gate)
+         + int(event.contains_ped_undr_sw_ped_gate)
+         + int(event.contains_ped_undr_nw_ped_gate),
+         int(event.contains_ped_undr_ne_veh_gate)
+         + int(event.contains_ped_undr_sw_veh_gate)])
+
+    IO.write_csv(report_file_path, header, rows)
+
+  # TODO: confirm that the csv can be opened after writing
   @staticmethod
   def write_stopped_on_crossing_incursion_event_report(
       report_file_name, report_dir_path, events, clip_length):
