@@ -42,12 +42,15 @@ from sort import *
 # Configuration settings
 # matplotlib.use('Agg')
 warnings.filterwarnings("ignore")
-segmentation_threshold = 0.65
+segmentation_threshold = 0.70
 INPUT_SIZE = 225
 new_size = INPUT_SIZE, INPUT_SIZE
 sort_max_age = 2
 sort_min_hits = 5
 sort_ios_threshold = .1
+boxes_thickness = 2
+boxes_text_size = 1
+boxes_text_thickness = 2
 # -------------------------------------------------------------
 
 # Detect if we have a GPU available
@@ -183,7 +186,7 @@ def instance_segmentation_visualize(img, predictions, threshold=0.5, rect_th=3, 
         cv2.putText(img,pred_cls[i], boxes[i][0], cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0),thickness=text_th)
     return img
 
-def instance_segmentation_visualize_sort(img, predictions, threshold=0.5, rect_th=1, text_size=.5, text_th=1):
+def instance_segmentation_visualize_sort(img, predictions, threshold=0.5, rect_th=1, text_size=1, text_th=1):
     masks, boxes, pred_cls = parse_seg_prediction(predictions, threshold)
     fixed_boxes = fix_box_format(boxes)
     if(fixed_boxes != []):
@@ -201,7 +204,7 @@ def instance_segmentation_visualize_sort(img, predictions, threshold=0.5, rect_t
         y = (int(sort_boxes[i][2]), int(sort_boxes[i][3]))
         cv2.rectangle(img,x, y,color=(0, 255, 0), thickness=rect_th)
         cv2.putText(img,'Object #' + str(int(sort_boxes[i][4])), (int(sort_boxes[i][0]), int(sort_boxes[i][1])), cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0), thickness=text_th)
-    return img
+    return img, sort_boxes
 
 def get_sort_id(box_x, sort_boxes):
     for box in sort_boxes:
@@ -285,7 +288,7 @@ for image in images_list:
         road_masks, road_boxes, road_scores = parse_seg_prediction(road_annotation, segmentation_threshold)
 
         # Process predictions for SORT tracking
-        road_img = instance_segmentation_visualize_sort(org_image1, road_annotation, segmentation_threshold)
+        road_img, road_sort_boxes = instance_segmentation_visualize_sort(org_image1, road_annotation, segmentation_threshold, boxes_thickness, boxes_text_size, boxes_text_thickness)
         road_output.append(road_scores)
         road_output.append(road_boxes)
     else:
@@ -298,7 +301,7 @@ for image in images_list:
 
     # write out the JSON
     combined_output = {}
-    # combined_output.update({'face':face_annotation[0]})
+    combined_output.update({'tracking':road_sort_boxes})
     combined_output.update({'roadway':road_output})
     dataoutput.write(str(combined_output) + '\n')
     dataoutput.flush()
