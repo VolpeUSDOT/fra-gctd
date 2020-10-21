@@ -25,9 +25,11 @@ import sys
 from os import listdir
 import csv
 import cv2
+import av
 import torch
 import torchvision
 from torchvision import datasets, models, transforms
+from torchvision.datasets.video_utils import VideoClips
 import argparse
 import numpy as np
 from pathlib import Path
@@ -36,6 +38,7 @@ from matplotlib import pyplot as plt
 from matplotlib import gridspec
 import matplotlib.style as style
 from retinaface.utils import vis_annotations
+from hurry.filesize import size, si
 from sort import *
 
 # -------------------------------------------------------------
@@ -51,6 +54,8 @@ sort_ios_threshold = .1
 boxes_thickness = 2
 boxes_text_size = 1
 boxes_text_thickness = 2
+batch_size = 2
+force_video_fps = 0
 # -------------------------------------------------------------
 
 # Detect if we have a GPU available
@@ -60,24 +65,6 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("PyTorch Version: ",torch.__version__)
 print("Torchvision Version: ",torchvision.__version__)
 print("Device in use: ",device)
-
-# FFMPEG command configuration
-if platform.system() == 'Windows':
-    # path to ffmpeg bin
-    FFMPEG_PATH = 'ffmpeg.exe'
-    FFPROBE_PATH = 'ffprobe.exe'
-else:
-    # path to ffmpeg bin
-    default_ffmpeg_path = '/usr/local/bin/ffmpeg'
-    default_ffprobe_path = '/usr/local/bin/ffprobe'
-    FFMPEG_PATH = default_ffmpeg_path if path.exists(default_ffmpeg_path) else '/usr/bin/ffmpeg'
-    FFPROBE_PATH = default_ffprobe_path if path.exists(default_ffprobe_path) else '/usr/bin/ffprobe'
-
-# ffmpeg_command = [
-#     FFMPEG_PATH, '-i', video_file_name,
-#     '-filter_complex', '"[0:0]vflip,crop=2400:800:1000:0;[0:5]crop=1200:1344:1500,transpose=1"', '-map', '0:0', '-map', '0:5' '-vcodec', 'rawvideo', '-pix_fmt', 'rgb24',
-#     '-hide_banner', '-loglevel', '0', '-f', 'image2pipe', '-'
-# ]
 
 # -------------------------------------------------------------
 # Annotation Labels / Classes
@@ -102,6 +89,16 @@ COCO_INSTANCE_VISIBLE_CATEGORY_NAMES = [
 ]
 
 # Helper functions
+
+def memstats():
+    current = torch.cuda.memory_allocated()
+    torch.cuda.empty_cache()
+    after = torch.cuda.memory_allocated()
+    return size((current),system=si), size((after),system=si)
+
+def pil_to_cv(image):
+    new_image = np.array(image)
+    return new_image[:, :, ::-1].copy()
 
 def load_labels(filePath):
     label_file = open(filePath, 'r')
@@ -134,11 +131,11 @@ def isodd(num):
 
 def parse_seg_prediction(pred, threshold):
 
-    pred_score = list(pred[0]['scores'].detach().cpu().numpy())
+    pred_score = list(pred['scores'].detach().cpu().numpy())
     pred_t = [pred_score.index(x) for x in pred_score if x>threshold][-1]
-    masks = (pred[0]['masks']>0.5).squeeze().detach().cpu().numpy()
-    pred_class = [COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(pred[0]['labels'].cpu().numpy())]
-    pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred[0]['boxes'].detach().cpu().numpy())]
+    masks = (pred['masks']>0.5).squeeze().detach().cpu().numpy()
+    pred_class = [COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(pred['labels'].cpu().numpy())]
+    pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred['boxes'].detach().cpu().numpy())]
     masks = masks[:pred_t+1]
     pred_boxes = pred_boxes[:pred_t+1]
     pred_class = pred_class[:pred_t+1]
@@ -193,6 +190,7 @@ def instance_segmentation_visualize_sort(img, predictions, threshold=0.5, rect_t
         sort_boxes = mot_tracker.update(fixed_boxes)
     else:
         sort_boxes = mot_tracker.update(np.empty((0, 5)))
+    
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     for i in range(len(masks)):
@@ -215,10 +213,7 @@ def get_sort_id(box_x, sort_boxes):
 # Deal with command line arguments.
 parser = argparse.ArgumentParser(description='Process some video files using Machine Learning!')
 parser.add_argument('--outputpath', '-o',   action='store',     required=False,     default='../temp/fraoutput',        help='Path to the directory where extracted data is stored.')
-parser.add_argument('--imagespath',  '-i',  action='store',     required=False,     default='../temp/fraframes',    help='Path to the extracted video frames in JPG format.')
-# parser.add_argument('--labelfile',  '-l',   action='store',     required=False,     default='./models/labels.txt',       help='Path to label file.')
-# parser.add_argument('--modelfile',  '-m',   action='store',     required=False,     help='Path to saved model file.',   default='./models/saved_model_squeezenet.pt')
-
+parser.add_argument('--inputpath',  '-i',  action='store',     required=False,     default='../temp/fravideos/KAQB0517_20170918104209.avi',    help='Path to the extracted video frames in JPG format.')
 args = parser.parse_args()
 
 # Load the segmentation model
@@ -236,103 +231,104 @@ model_road.eval()
 # labels = load_labels(args.labelfile)
 
 # setup regular SORT tracking
-mot_tracker = Sort(max_age=sort_max_age, min_hits=sort_min_hits, iou_threshold=sort_ios_threshold)
-
-# get the list of images we will process
-images_list = []
-images_list = get_file_list(args.imagespath, 'jpg')
-
-dataoutput = open(Path(args.outputpath) / Path('data.json'), 'w')
+mot_tracker = Sort(max_age=sort_max_age, min_hits=sort_min_hits, iou_threshold=sort_ios_threshold) 
 
 # set start time
 start = timeit.default_timer()
 
-# it = iter(images_list)
-frame_num = 1
-for image in images_list:
+# load up the data
+videopath = Path(args.inputpath)
+video_clips = VideoClips([str(videopath)], clip_length_in_frames=batch_size, frames_between_clips=batch_size)
 
-    # setup our two images
-    source_image1 = image
-    # source_image2 = next(it)
+# let's grab some video metadata
+if(force_video_fps == 0):
+    video_output_fps = int(video_clips.video_fps[0])
 
-    image_path = Path(args.imagespath) / Path(source_image1)
-    target_image1 = cv2.imread(str(image_path))
-    org_image1 = target_image1
+# tabular and video data output
+dataoutput = open(Path(args.outputpath) / Path('data.json'), 'w')
 
-    # image_path = Path(args.imagespath) / Path(source_image2)
-    # target_image2 = cv2.imread(str(image_path))
-    # org_image2 = target_image2
+input_filename, ext = os.path.splitext(os.path.basename(args.inputpath))
+output_filename = str(Path(args.outputpath) / Path(str(input_filename) + '-processed.mp4'))
+video, audio, info, video_idx = video_clips.get_clip(0)
+frame_height = video[0].size()[0]
+frame_width = video[0].size()[1]
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+# fourcc = cv2.VideoWriter_fourcc(*'XVID')
+videoSize = (frame_width, frame_height)
+print('Saving video as: ', output_filename)
+video_out = cv2.VideoWriter(output_filename, fourcc, video_output_fps, (videoSize))
 
-    # process image for activiity classification
-    # target_image2_class = transforms.ToPILImage()(org_image2)
-    # target_image2_class = transforms.Resize(new_size)(target_image2_class)
-    # target_image2_class = torchvision.transforms.functional.to_tensor(target_image2_class)
-    # target_image2_class = target_image2_class.to(device)
-    # target_image2_class = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(target_image2_class)
-    # target_image2_class = target_image2_class.unsqueeze(0)
-
-    # run models on the processed data
-    # activitiy_classification = model_class(target_image2_class)
+framecount = 0
+extracted_data = []
+for chunk in range(video_clips.num_clips()):
+    video, audio, info, video_idx = video_clips.get_clip(chunk)
+    video_output_fps = int(info['video_fps'])
     
-    target_image1 = torchvision.transforms.functional.to_tensor(target_image1)
-    target_image1 = target_image1.to(device)
-    target_image1 = target_image1.unsqueeze(0)
+    image_stack = []
+    org_image_stack = []
+    for frame in video:
+        org_image = frame.permute(2,0,1)
+        org_image = transforms.ToPILImage()(org_image)
+        new_image = transforms.ToTensor()(org_image)
+        new_image = new_image.numpy()
+        image_stack.append(new_image)
+        org_image_stack.append(org_image)
+
+    image_stack = np.asarray(image_stack)
+    image_stack = torch.from_numpy(image_stack)
+
+    mem_before = torch.cuda.memory_allocated()
     
-    # get model predictions
-    road_annotation = model_road(target_image1)
+    # print('Before loading data:', memstats())
+    # load batch onto GPU / or register in CPU
+    image_stack = image_stack.to(device)
+    # print('After loading data:', memstats())
 
-    # create JSON output
-    road_output = []
+    # get the model predictions / annotations
+    road_annotations = model_road(image_stack)
 
-    if ([i for i in road_annotation[0]['scores'] if i >= segmentation_threshold]):        
-        road_masks, road_boxes, road_scores = parse_seg_prediction(road_annotation, segmentation_threshold)
+    n = 0
+    for road_annotation in road_annotations:
 
-        # Process predictions for SORT tracking
-        road_img, road_sort_boxes = instance_segmentation_visualize_sort(org_image1, road_annotation, segmentation_threshold, boxes_thickness, boxes_text_size, boxes_text_thickness)
-        road_output.append(road_scores)
-        road_output.append(road_boxes)
-    else:
-        mot_tracker.update(np.empty((0, 5)))
-        road_img = org_image1
+        # setup our images
+        org_image1 = pil_to_cv(org_image_stack[n])
 
-    # save the frame to disk
-    new_img_filename = Path(args.outputpath) / Path('frame_' + str(frame_num).zfill(5) + '.jpg')
-    cv2.imwrite(str(new_img_filename), road_img,[int(cv2.IMWRITE_JPEG_QUALITY), 90])
+        # create JSON output
+        road_output = []
 
-    # write out the JSON
-    combined_output = {}
-    combined_output.update({'tracking':road_sort_boxes})
-    combined_output.update({'roadway':road_output})
-    dataoutput.write(str(combined_output) + '\n')
-    dataoutput.flush()
+        if ([i for i in road_annotation['scores'] if i >= segmentation_threshold]):
+            road_masks, road_boxes, road_scores = parse_seg_prediction(road_annotation, segmentation_threshold)
 
-    # setup our output visuals
-    # style.use('default')
-    # plt.axis('off')
-    # plt.tight_layout(pad=0.1)
-    # plt.rcParams['text.color'] = 'white'
+            # Process predictions for SORT tracking
+            road_img, road_sort_boxes = instance_segmentation_visualize_sort(org_image1, road_annotation, segmentation_threshold, boxes_thickness, boxes_text_size, boxes_text_thickness)
+            road_output.append(road_scores)
+            road_output.append(road_boxes)
+        else:
+            mot_tracker.update(np.empty((0, 5)))
+            road_img = org_image1
 
-    # fig, final_visual = plt.subplots(2,1)
-    # fig.patch.set_facecolor('xkcd:dark grey')
-    # final_visual[0].set_xticks([])
-    # final_visual[0].set_yticks([])
-    # final_visual[1].set_xticks([])
-    # final_visual[1].set_yticks([])
-    # plt.title('Glance Classification: ' + str(max_classification_label), fontsize=7)
-    # if(face_annotation[0]['score'] == -1):
-    #    final_visual[0].imshow(org_image2)
-    # else:
-    #    final_visual[0].imshow(vis_annotations(target_image2, face_annotation))
-    # plt.title('Roadway Objects Detected: ' + str(len(road_scores)), fontsize=10)
-    # final_visual[1].imshow(road_img)
-    # plt.savefig(Path(args.outputpath) / Path('frame_' + str(frame_num).zfill(5) + '.jpg'),bbox_inches='tight', dpi=250)
-    # plt.close()
-    frame_num += 1
+        # save the frame to disk
+        # new_img_filename = Path(args.outputpath) / Path('frame_' + str(framecount).zfill(5) + '.jpg')
+        video_out.write(road_img)
+        # cv2.imwrite(str(new_img_filename), road_img,[int(cv2.IMWRITE_JPEG_QUALITY), 90])
 
-    # clean up the GPU cache
-    # torch.cuda.empty_cache()
+        # write out the JSON
+        combined_output = {}
+        combined_output.update({'tracking':road_sort_boxes.tolist()})
+        combined_output.update({'roadway':road_output})
+        dataoutput.write(str(combined_output) + '\n')
+        dataoutput.flush()
+
+        framecount += 1
+        n += 1
+    
+    del image_stack
+    del road_annotations
+    # print('After running model data:', memstats())
 
 dataoutput.close()
+video_out.release() 
+
 # Wrap up
 print(' ')
 stop = timeit.default_timer()
