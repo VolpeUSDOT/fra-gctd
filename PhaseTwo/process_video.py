@@ -14,18 +14,16 @@
 ## Status: Active Development
 ##################################################
 
-import random
+# import random
 import warnings
+import datetime
 import time
 import timeit
 import platform
 import json
 import os
 import sys
-from os import listdir
-import csv
 import cv2
-import av
 import torch
 import torchvision
 from torchvision import datasets, models, transforms
@@ -33,11 +31,6 @@ from torchvision.datasets.video_utils import VideoClips
 import argparse
 import numpy as np
 from pathlib import Path
-from retinaface.pre_trained_models import get_model
-from matplotlib import pyplot as plt
-from matplotlib import gridspec
-import matplotlib.style as style
-from retinaface.utils import vis_annotations
 from hurry.filesize import size, si
 from sort import *
 
@@ -54,17 +47,30 @@ sort_ios_threshold = .1
 boxes_thickness = 2
 boxes_text_size = 1
 boxes_text_thickness = 2
-batch_size = 2
+batch_size = 10
 force_video_fps = 0
 # -------------------------------------------------------------
 
 # Detect if we have a GPU available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = 'cpu'
 
 # Debug data
 print("PyTorch Version: ",torch.__version__)
 print("Torchvision Version: ",torchvision.__version__)
 print("Device in use: ",device)
+
+# detect platform for FFMPEG
+# if platform.system() == 'Windows':
+#     # path to ffmpeg bin
+#     FFMPEG_PATH = 'ffmpeg.exe'
+#     FFPROBE_PATH = 'ffprobe.exe'
+# else:
+#     # path to ffmpeg bin
+#     default_ffmpeg_path = '/usr/local/bin/ffmpeg'
+#     default_ffprobe_path = '/usr/local/bin/ffprobe'
+#     FFMPEG_PATH = default_ffmpeg_path if path.exists(default_ffmpeg_path) else '/usr/bin/ffmpeg'
+#     FFPROBE_PATH = default_ffprobe_path if path.exists(default_ffprobe_path) else '/usr/bin/ffprobe'
 
 # -------------------------------------------------------------
 # Annotation Labels / Classes
@@ -90,11 +96,52 @@ COCO_INSTANCE_VISIBLE_CATEGORY_NAMES = [
 
 # Helper functions
 
-def memstats():
+def memclear():
     current = torch.cuda.memory_allocated()
     torch.cuda.empty_cache()
     after = torch.cuda.memory_allocated()
     return size((current),system=si), size((after),system=si)
+
+def run_model(model, data):
+    with torch.no_grad():
+        return model(data)
+
+# def ffmpeg_getinfo(vid_file_path):
+
+#     if type(vid_file_path) != str:
+#         raise Exception('Give ffprobe a full file path of the video')
+#         return
+
+#     command = ["ffprobe",
+#             "-loglevel",  "quiet",
+#             "-print_format", "json",
+#              "-show_format",
+#              "-show_streams",
+#              vid_file_path
+#              ]
+
+# def ffmpeg_process_video(video_file_name, deinterlace=False):
+#     # FFMPEG commands for video frame extraction
+    
+#     video_filename, video_file_extension = path.splitext(path.basename(video_file_name))
+#     video_metadata = ffmpeg_getinfo(video_file_name)
+#     num_seconds = int(float(video_metadata['streams'][0]['duration']))
+#     num_of_frames = int(float(video_metadata['streams'][0]['duration_ts']))
+#     video_width = int(video_metadata['streams'][0]['width'])
+#     video_height = int(video_metadata['streams'][0]['height'])
+    
+#     if deinterlace == True:
+#         deinterlace = 'yadif'
+#     else:
+#         deinterlace = ''
+
+#     ffmpeg_command = [
+#         FFMPEG_PATH, '-i', video_file_name,
+#         '-vf', 'fps=' + args.fps, '-r', args.fps, '-vcodec', 'rawvideo', '-pix_fmt', 'rgb24', '-vsync', 'vfr',
+#         '-hide_banner', '-loglevel', '0', '-vf', ffmpeg_deinterlace, '-f', 'image2pipe', '-vf', 'scale=' + frame_size, '-'
+#     ]
+
+#     image_pipe = subprocess.Popen(command, stdout=subprocess.PIPE, bufsize=4*1024*1024)
 
 def pil_to_cv(image):
     new_image = np.array(image)
@@ -213,13 +260,11 @@ def get_sort_id(box_x, sort_boxes):
 # Deal with command line arguments.
 parser = argparse.ArgumentParser(description='Process some video files using Machine Learning!')
 parser.add_argument('--outputpath', '-o',   action='store',     required=False,     default='../temp/fraoutput',        help='Path to the directory where extracted data is stored.')
-parser.add_argument('--inputpath',  '-i',  action='store',     required=False,     default='../temp/fravideos/KAQB0517_20170918104209.avi',    help='Path to the extracted video frames in JPG format.')
+parser.add_argument('--inputpath',  '-i',  action='store',     required=False,     default='../temp/fravideos/KANH0685_20160420080911.avi',    help='Path to the extracted video frames in JPG format.')
 args = parser.parse_args()
 
-# Load the segmentation model
+# Load the object detection model
 model_road = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True).to(device)
-# model_road = torchvision.models.segmentation.deeplabv3_resnet50(pretrained=True).to(device)
-# model_road = torchvision.models.segmentation.fcn_resnet50(pretrained=True).to(device)
 model_road.eval()
 
 # load the activity classification model
@@ -255,6 +300,7 @@ frame_width = video[0].size()[1]
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 # fourcc = cv2.VideoWriter_fourcc(*'XVID')
 videoSize = (frame_width, frame_height)
+
 print('Saving video as: ', output_filename)
 video_out = cv2.VideoWriter(output_filename, fourcc, video_output_fps, (videoSize))
 
@@ -263,7 +309,7 @@ extracted_data = []
 for chunk in range(video_clips.num_clips()):
     video, audio, info, video_idx = video_clips.get_clip(chunk)
     video_output_fps = int(info['video_fps'])
-    
+
     image_stack = []
     org_image_stack = []
     for frame in video:
@@ -279,16 +325,26 @@ for chunk in range(video_clips.num_clips()):
 
     mem_before = torch.cuda.memory_allocated()
     
-    # print('Before loading data:', memstats())
     # load batch onto GPU / or register in CPU
     image_stack = image_stack.to(device)
-    # print('After loading data:', memstats())
 
     # get the model predictions / annotations
-    road_annotations = model_road(image_stack)
+    road_annotations = run_model(model_road, image_stack)
+    memclear()
 
     n = 0
     for road_annotation in road_annotations:
+
+        # get timestamps for each frame
+        if framecount == 0:
+            video_timestamp = 0
+        else:
+            video_timestamp = framecount / video_output_fps
+
+        video_timestamp = datetime.timedelta(seconds=video_timestamp)
+        video_data = {}
+        video_data['frame_number'] = str(framecount)
+        video_data['frame_timestamp'] = str(video_timestamp)
 
         # setup our images
         org_image1 = pil_to_cv(org_image_stack[n])
@@ -307,13 +363,15 @@ for chunk in range(video_clips.num_clips()):
             mot_tracker.update(np.empty((0, 5)))
             road_img = org_image1
 
-        # save the frame to disk
-        # new_img_filename = Path(args.outputpath) / Path('frame_' + str(framecount).zfill(5) + '.jpg')
+        # fix the colors..
+        road_img = cv2.cvtColor(road_img, cv2.COLOR_BGR2RGB)
+        
+        # save the video to disk
         video_out.write(road_img)
-        # cv2.imwrite(str(new_img_filename), road_img,[int(cv2.IMWRITE_JPEG_QUALITY), 90])
 
         # write out the JSON
         combined_output = {}
+        combined_output.update({'video':video_data})
         combined_output.update({'tracking':road_sort_boxes.tolist()})
         combined_output.update({'roadway':road_output})
         dataoutput.write(str(combined_output) + '\n')
@@ -322,17 +380,20 @@ for chunk in range(video_clips.num_clips()):
         framecount += 1
         n += 1
     
+    # clean up memory
     del image_stack
     del road_annotations
-    # print('After running model data:', memstats())
 
 dataoutput.close()
 video_out.release() 
 
-# Wrap up
+# Wrap up (might want to remove this once integrated into Electron)
 print(' ')
 stop = timeit.default_timer()
 total_time = stop - start
 mins, secs = divmod(total_time, 60)
 hours, mins = divmod(mins, 60)
 sys.stdout.write("Total running time: %d:%d:%d.\n" % (hours, mins, secs))
+
+# For memory debugging
+#print(torch.cuda.memory_summary())
