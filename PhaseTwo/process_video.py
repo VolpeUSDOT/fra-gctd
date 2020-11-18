@@ -57,11 +57,11 @@ force_video_height = 720
 # Deep Sort Config
 class DEEPSORT_CONFIG_CLASS():
         REID_CKPT =  "./PhaseTwo/deep_sort/deep/checkpoint/ckpt.t7"
-        MAX_DIST =  0.2
-        MIN_CONFIDENCE = 0.3
-        NMS_MAX_OVERLAP = 0.5
-        MAX_IOU_DISTANCE = 0.7
-        MAX_AGE = 70
+        MAX_DIST =  0.9
+        MIN_CONFIDENCE = 0.4
+        NMS_MAX_OVERLAP = 0.8
+        MAX_IOU_DISTANCE = 0.9
+        MAX_AGE = 100
         N_INIT = 3
         NN_BUDGET = 100
 
@@ -300,7 +300,7 @@ if __name__ == '__main__':
             else:
                 sort_boxes = sort_trackers[classname].update(fix_box_format(boxes))
         
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         label_color_idx = COCO_INSTANCE_VISIBLE_CATEGORY_NAMES.index(classname)
 
