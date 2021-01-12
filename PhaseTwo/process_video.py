@@ -90,6 +90,12 @@ if __name__ == '__main__':
     print("Device in use: ",device)
     print("Device memory: ", str(size(device_memory, system=si)))
 
+    # Deal with command line arguments.
+    parser = argparse.ArgumentParser(description='Process some video files using Machine Learning!')
+    parser.add_argument('--outputpath', '-o',   action='store',     required=False,     default='../temp/fraoutput',        help='Path to the directory where extracted data is stored.')
+    parser.add_argument('--inputpath',  '-i',   action='store',     required=False,     default='E:/FRA/ramsey/20180418/Ch02_20180418000000_20180418235959_1a.avi',    help='Path to the extracted video frames in JPG format.')
+    args = parser.parse_args()
+
     # detect platform for FFMPEG
     # if platform.system() == 'Windows':
     #     # path to ffmpeg bin
@@ -346,11 +352,6 @@ if __name__ == '__main__':
                 return int(box[4])
 
     # -------------------------------------------------------------
-    # Deal with command line arguments.
-    parser = argparse.ArgumentParser(description='Process some video files using Machine Learning!')
-    parser.add_argument('--outputpath', '-o',   action='store',     required=False,     default='../temp/fraoutput',        help='Path to the directory where extracted data is stored.')
-    parser.add_argument('--inputpath',  '-i',   action='store',     required=False,     default='E:/FRA/ramsey/20180418/Ch02_20180418000000_20180418235959_1a.avi',    help='Path to the extracted video frames in JPG format.')
-    args = parser.parse_args()
 
     # Load the object detection model
     model_road = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True).to(device)
@@ -405,6 +406,9 @@ if __name__ == '__main__':
     extracted_data = []
     
     for chunk in range(video_clips.num_clips()):
+        progress = str(round((chunk / video_clips.num_clips() * 100), 1)) + "% complete"
+        sys.stdout.write("Processing: %s   \r" % (progress) )
+        sys.stdout.flush()
         video, audio, info, video_idx = video_clips.get_clip(chunk)
         video_output_fps = int(info['video_fps'])
 
@@ -421,8 +425,6 @@ if __name__ == '__main__':
 
         image_stack = np.asarray(image_stack)
         image_stack = torch.from_numpy(image_stack)
-        
-        # print(str(size(sys.getsizeof(image_stack.storage()), system=si)))
 
         # load batch onto GPU / or register in CPU
         image_stack = image_stack.to(device)
