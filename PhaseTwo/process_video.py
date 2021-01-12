@@ -70,7 +70,11 @@ DEEPSORT_CONFIG = DEEPSORT_CONFIG_CLASS()
 
 # Detect if we have a GPU available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# device = 'cpu'
+try:
+    device
+except NameError:
+    # device was not set to something, we assume CPU to be more compatible. 
+    device = "cpu"
 
 device_memory = 0
 if(device != 'cpu'):
@@ -134,7 +138,6 @@ if __name__ == '__main__':
         # initialize the dimensions of the image to be resized and
         # grab the image size
         dim = None
-        # (h, w) = image.shape[:2]
 
         # if both the width and height are None, then return the
         # original image
