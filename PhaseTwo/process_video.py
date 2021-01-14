@@ -23,7 +23,23 @@ import platform
 import json
 import os
 import sys
+
+## 'Unused' imports, required to make pyinstaller included them during compilation
+import scipy
+import av
+from scipy.stats import statlib
+from scipy.integrate import _odepack
+from scipy.interpolate import _fitpack
+from scipy.optimize import linesearch
+import scipy.optimize
+import numpy.core.multiarray
+import torch.onnx.symbolic_opset7
+from scipy.optimize import minpack2
+import scipy.linalg._fblas as fblas
+import scipy.sparse.linalg.isolve.iterative
+
 import cv2
+import multiprocessing
 import torch
 import torchvision
 from torchvision import datasets, models, transforms
@@ -56,7 +72,7 @@ force_video_height = 720
 
 # Deep Sort Config
 class DEEPSORT_CONFIG_CLASS():
-        REID_CKPT =  "./PhaseTwo/deep_sort/deep/checkpoint/ckpt.t7"
+        REID_CKPT =  "./deep_sort/deep/checkpoint/ckpt.t7"
         MAX_DIST =  0.9
         MIN_CONFIDENCE = 0.4
         NMS_MAX_OVERLAP = 0.8
@@ -75,14 +91,17 @@ try:
 except NameError:
     # device was not set to something, we assume CPU to be more compatible. 
     device = "cpu"
-
+device = 'cpu'
 device_memory = 0
-if(device != 'cpu'):
+if device != 'cpu':
     device_memory = torch.cuda.get_device_properties(device).total_memory
 #     torch.backends.cudnn.benchmark = True
 #     torch.backends.cudnn.enabled = True
 
 if __name__ == '__main__':
+    # This is required here to compile with pyinstaller for windows
+    # TODO add logic to remove it for linux?
+    multiprocessing.freeze_support()
 
     # Debug data
     print("PyTorch Version: ",torch.__version__)
@@ -378,6 +397,7 @@ if __name__ == '__main__':
 
     # load up the data
     videopath = Path(args.inputpath)
+    print('Videopath: ' + str(videopath))
     print('Indexing input video...')
     video_clips = VideoClips([str(videopath)], clip_length_in_frames=batch_size, frames_between_clips=batch_size, num_workers=num_of_workers)
 

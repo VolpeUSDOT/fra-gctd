@@ -2,3 +2,5 @@ numpy
 pathlib
 hurry.filesize
 yaml
+scikit-image
+filterpy

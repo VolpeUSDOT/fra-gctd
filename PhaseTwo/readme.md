@@ -27,6 +27,18 @@ Generate video
 ffmpeg -i fraoutput\frame_%05d.jpg -c:v libx264 -vf "fps=15,format=yuv420p,scale=w=900:h=-1:force_original_aspect_ratio=decrease,pad='iw+mod(iw\,2)':'ih+mod(ih\,2)'" FRA_GCTD_demo1.mp4
 ```
 
+## Compile to exe
+
+The application may be compiled to an executable using pyinstaller, which may be installed using pip. Once you have done so, run the following command in the PhaseTwo directory:
+
+```
+pyinstaller --add-data deep_sort;deep_sort --exclude-module=torch.distributions --onedir process_video.py
+```
+
+This will create a 'dist/process_video' directory which contains process_video.exe and required library files.
+
+It is highly recommended that you create a virtual python environment within this directory if compiling; otherwise pyinstaller will likely have issues finding the required files outside this directory
+
 ## License
 
 MIT
