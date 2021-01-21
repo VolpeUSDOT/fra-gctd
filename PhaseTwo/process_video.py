@@ -6,7 +6,7 @@
 ##################################################
 ## Author: Robert Rittmuller
 ## Copyright: Copyright 2020, Volpe National Transportation Systems Center
-## Credits: <add reference to SORT here>
+## Credits: <add reference to SORT & Deep SORT here>
 ## License: MIT
 ## Version: 0.0.1
 ## Mmaintainer: Robert Rittmuller
@@ -37,7 +37,6 @@ from deep_sort import build_tracker
 
 # -------------------------------------------------------------
 # Configuration settings
-# matplotlib.use('Agg')
 warnings.filterwarnings("ignore")
 segmentation_threshold = 0.75
 INPUT_SIZE = 225
