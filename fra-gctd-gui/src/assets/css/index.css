@@ -1,0 +1,45 @@
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: auto;
+  background: white;
+  overflow: hidden;
+}
+
+#page-container {
+  position: relative;
+  min-height: 100vh;
+}
+
+.header {
+  height:100px;
+  background:#15396c;
+  padding:20px;
+}
+
+.headerImage {
+  float: left;
+  max-height:75%;
+}
+
+.content {
+  padding: 10px;
+  padding-bottom:100px;
+}
+
+.welcome {
+  text-align: center;
+}
+
+.dropzone {
+  width:75%;
+  height:100px;
+  border:dotted;
+  border-width:2px;
+  text-align:center;
+  margin: auto;
+}
+
+.videoList {
+  overflow:auto;
+  height: 60vh;
+}

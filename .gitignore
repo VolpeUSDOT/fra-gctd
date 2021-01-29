@@ -130,3 +130,18 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Pyinstaller directories
+PhaseTwo/dist
+PhaseTwo/build
+PhaseTwo/Include
+
+# venv
+PhaseTwo/Scripts
+PhaseTwo/share
+PhaseTwo/pyvenv.cfg
+
+# Temp
+temp
+
+.vs
