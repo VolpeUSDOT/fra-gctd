@@ -48,11 +48,11 @@ sort_ios_threshold = .1
 boxes_thickness = 1
 boxes_text_size = 1
 boxes_text_thickness = 1
-batch_size = 6
+batch_size = 12
 num_of_workers = 2
 force_video_fps = 0
 force_video_width = None
-force_video_height = 720
+force_video_height = 480
 
 # grade / right-of-way segmentation model settings
 grade_num_classes = 2
@@ -342,7 +342,7 @@ if __name__ == '__main__':
                     idx += 1
                 road_img, grade_masks = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
                 detect_object_overlap(grade_masks,GRADE_CATEGORY_NAMES,collected_masks,collected_labels)
-                road_img = instance_segmentation_visualize_sort(road_img, collected_masks, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, segmentation_threshold, classname=label)
+                road_img = instance_segmentation_visualize_sort(road_img, collected_masks, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
                 new_line = [collected_boxes]
                 boxes_by_label[label] = new_line
             

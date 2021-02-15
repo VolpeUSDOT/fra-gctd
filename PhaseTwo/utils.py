@@ -16,6 +16,7 @@
 # import modules
 import cv2
 import numpy as np
+from numpy.core.arrayprint import format_float_scientific
 import torchvision
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
@@ -37,6 +38,21 @@ COCO_INSTANCE_CATEGORY_NAMES = [
     'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
 ]
 
+def is_in_area(detections, threshold=.001):
+    for detection in detections:
+        if(detection[2] >= threshold):
+            return True
+    
+    return False
+
+def dice_metric(inputs, target):
+    intersection = 2.0 * (target * inputs).sum()
+    union = target.sum() + inputs.sum()
+    if target.sum() == 0 and inputs.sum() == 0:
+        return 1.0
+
+    return intersection / union
+
 def detect_object_overlap(detection_masks, detection_masks_labels, object_masks, object_masks_labels):
     # compare masks from passed lists to see if we get high overlap scores for any objects
     object_index = 0
@@ -46,19 +62,9 @@ def detect_object_overlap(detection_masks, detection_masks_labels, object_masks,
 
         detection_index = 0
         for detection_mask in detection_masks:
-            # print(object_label, get_overlap_score(detection_mask,object_mask), detection_masks_labels[detection_index])
+            overlap_score = dice_metric(detection_mask,object_mask)
+            # print(object_label, overlap_score, detection_masks_labels[detection_index])
             detection_index += 1
-
-def get_overlap_score(maskA, maskB):
-    # calculate the overlap between two segmentation masks
-    # note, this is different from standard IoU or other types of similar scores
-
-    # combine the masks
-    overlap = maskA + maskB
-    flat_overlap = np.ndarray.flatten(overlap)
-    overlap_score = np.average(flat_overlap)
-
-    return overlap_score
 
 def image_resize(org_width, org_height, width = None, height = None):
         # initialize the dimensions of the image to be resized and
@@ -174,7 +180,10 @@ def instance_segmentation_visualize(img, predictions, threshold=0.5, rect_th=3, 
         cv2.putText(img,pred_cls[i], boxes[i][0], cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0),thickness=text_th)
     return img
 
-def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, labels, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, threshold=0.5, rect_th=2, text_size=.75, text_th=2, classname='Object'):
+def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, labels, 
+                                        LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, 
+                                        deep_sort_tracker, detection_masks, detection_masks_labels, 
+                                        threshold=0.5, rect_th=2, text_size=.75, text_th=2, classname='Object'):
         
         # if there are no objects detected, we still need to notify the SORT object
         if(len(boxes) == 0):
@@ -193,12 +202,23 @@ def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, la
         label_color_idx = labels.index(classname)
 
         for i in range(len(masks)):
-            rgb_mask = colour_masks(masks[i], LABEL_COLORS[label_color_idx])
+            detection_index = 0
+            detection_zones_scores = []
+            for detection_zone in detection_masks:
+                detection = detection_masks_labels[detection_index], classname, dice_metric(masks[i],detection_zone)
+                detection_zones_scores.append(detection)
+                detection_index += 1
+
+            if(is_in_area(detection_zones_scores)):
+                rgb_mask = colour_masks(masks[i], LABEL_COLORS[3])
+            else:
+                rgb_mask = colour_masks(masks[i], LABEL_COLORS[label_color_idx])
             img = cv2.addWeighted(img, 1, rgb_mask, 0.5, 0)
 
         for i in range(len(sort_boxes)):
             x = (int(sort_boxes[i][0]), int(sort_boxes[i][1]))
             y = (int(sort_boxes[i][2]), int(sort_boxes[i][3]))
+            # if(is_in_area(detection_zones_scores)):
             cv2.rectangle(img,x, y,color=(0, 255, 0), thickness=rect_th)
             cv2.putText(img, str(classname) + ' #' + str(int(sort_boxes[i][4])), (int(sort_boxes[i][0]), int(sort_boxes[i][1])), cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0), thickness=text_th)
         
