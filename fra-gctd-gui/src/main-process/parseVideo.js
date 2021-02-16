@@ -8,7 +8,7 @@ var videosProcessed = [];
 
 var videoInProcess = null;
 
-const processDir = app.getAppPath() + "\\src\\assets\\executables\\process_video";
+const processDir = app.getAppPath() + "\\resources\\executables\\process_video";
 
 exports.addVideo = addVideo;
 

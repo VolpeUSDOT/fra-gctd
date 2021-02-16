@@ -90,3 +90,4 @@ out/
 
 # Executable directory
 src/assets/executables/*
+resources/executables/*
