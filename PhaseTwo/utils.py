@@ -200,7 +200,6 @@ def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, la
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         label_color_idx = labels.index(classname)
-
         for i in range(len(masks)):
             detection_index = 0
             detection_zones_scores = []
