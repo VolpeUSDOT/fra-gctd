@@ -153,10 +153,26 @@ if __name__ == '__main__':
         with torch.no_grad():
             return model(data)
 
-    def create_csv():
+    def create_csv_from_json():
         with open(Path(args.outputpath) / Path(str(input_filename + '-data.json'))) as json_output:
             data = json.load(json_output)
-        
+        csv_file = open(Path(args.outputpath) / Path(str(input_filename + '-data.csv')), 'w')
+        writer = csv.writer(csv_file)
+        header = ["frame_number", "frame_timestamp", "label", "bbox"]
+        writer.writerow(header)
+        for frame in data:
+            videoData = frame["video"]
+            trackingData = frame["tracking"]
+            for label in trackingData:
+                if len(trackingData[label][0]) > 0:
+                    for bbox in trackingData[label]:
+                        row = []
+                        row.append(videoData["frame_number"])
+                        row.append(videoData["frame_timestamp"])
+                        row.append(label)
+                        row.append(str(bbox))
+                        writer.writerow(row)
+        csv_file.close()
 
     # def ffmpeg_getinfo(vid_file_path):
 
@@ -386,8 +402,8 @@ if __name__ == '__main__':
                 lineEnd = '\n'
             # Replace characters in str output to make this valid JSON
             outputline = (str(combined_output) + lineEnd).replace("'", '"')
-            outputline = outputline.replace("(", "[")
-            outputline = outputline.replace(")", "]")
+            outputline = outputline.replace("(", "\"(")
+            outputline = outputline.replace(")", ")\"")
             dataoutput.write(outputline)
             dataoutput.flush()
 
@@ -402,7 +418,7 @@ if __name__ == '__main__':
     dataoutput.flush()
     dataoutput.close()
     video_out.release() 
-
+    create_csv_from_json()
     # Wrap up (might want to remove this once integrated into Electron)
     print(' ')
     stop = timeit.default_timer()
