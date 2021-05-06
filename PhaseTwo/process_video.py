@@ -54,6 +54,7 @@ from utils import image_resize, pil_to_cv, parse_seg_prediction, instance_segmen
 
 # -------------------------------------------------------------
 # Configuration settings
+computer_device = "cuda:0"
 warnings.filterwarnings("ignore")
 segmentation_threshold = 0.75
 INPUT_SIZE = 225
@@ -103,39 +104,47 @@ class DEEPSORT_CONFIG_CLASS():
 DEEPSORT_CONFIG = DEEPSORT_CONFIG_CLASS()
 # -------------------------------------------------------------
 
-# Detect if we have a GPU available
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-try:
-    device
-except NameError:
-    # device was not set to something, we assume CPU to be more compatible. 
-    device = "cpu"
-device='cpu'
-device_memory = 0
-if(device != 'cpu'):
-    device_memory = torch.cuda.get_device_properties(device).total_memory
-    # device_memory_reserved = torch.cuda.memory_reserved(device) 
-    # device_memory_allocated = torch.cuda.memory_allocated(device)
-    # device_memory_free = device_memory_reserved - device_memory_allocated  # free inside reserved
-    
-#     torch.backends.cudnn.benchmark = True
-#     torch.backends.cudnn.enabled = True
-
 if __name__ == '__main__':
 
     # Necessary to run compiled on Windows
     #multiprocessing.freeze_support()
-    # Debug data
-    print("PyTorch Version: ",torch.__version__)
-    print("Torchvision Version: ",torchvision.__version__)
-    print("Device in use: ",device)
-    print("Device memory: ", str(size(device_memory, system=si)))
 
     # Deal with command line arguments.
     parser = argparse.ArgumentParser(description='Process some video files using Machine Learning!')
-    parser.add_argument('--outputpath', '-o',   action='store',     required=False,     default='../../temp/fraoutput',        help='Path to the directory where extracted data is stored.')
-    parser.add_argument('--inputpath',  '-i',   action='store',     required=False,     default='/mnt/ml_data/FRA/sourcevideos/ramsey/20180418/Ch02_20180418000000_20180418235959_1e.avi',    help='Path to the extracted video frames in JPG format.')
+    parser.add_argument('--outputpath', '-o',   action='store',         required=False,     default='../../temp/fraoutput',         help='Path to the directory where extracted data is stored.')
+    parser.add_argument('--inputpath',  '-i',   action='store',         required=False,     default='/mnt/ml_data/FRA/sourcevideos/ramsey/20180418/Ch02_20180418000000_20180418235959_1e.avi',    help='Path to the extracted video frames in JPG format.')
+    parser.add_argument('--cpu', '-c',          action='store_true',    required=False,     default=False,                           help='Toggles CPU-only mode.')
+
     args = parser.parse_args()
+
+    # Detect if we have a GPU available
+    if(args.cpu == False):
+        device = torch.device(computer_device if torch.cuda.is_available() else "cpu")
+    else: 
+        device = "cpu"
+    try:
+        device
+    except NameError:
+        # device was not set to something, we assume CPU to be more compatible. 
+        device = "cpu"
+
+    device_memory = 0
+    device_name = 'CPU'
+    if(device != 'cpu'):
+        device_name = torch.cuda.get_device_name(torch.cuda.current_device())
+        device_memory = torch.cuda.get_device_properties(device).total_memory
+        # device_memory_reserved = torch.cuda.memory_reserved(device) 
+        # device_memory_allocated = torch.cuda.memory_allocated(device)
+        # device_memory_free = device_memory_reserved - device_memory_allocated  # free inside reserved
+        
+    #     torch.backends.cudnn.benchmark = True
+    #     torch.backends.cudnn.enabled = True
+
+    # Debug data
+    print("PyTorch Version: ",torch.__version__)
+    print("Torchvision Version: ",torchvision.__version__)
+    print("Device in use: ",device, device_name)
+    print("Device memory: ", str(size(device_memory, system=si)))
 
     # detect platform for FFMPEG
     # if platform.system() == 'Windows':
