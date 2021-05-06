@@ -38,10 +38,10 @@ COCO_INSTANCE_CATEGORY_NAMES = [
     'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
 ]
 
-def is_in_area(detections, threshold=.001):
+def is_in_area(detections, threshold=0.001):
     for detection in detections:
         if(detection[2] >= threshold):
-            return True
+            return detection[0]
     
     return False
 
@@ -182,8 +182,8 @@ def instance_segmentation_visualize(img, predictions, threshold=0.5, rect_th=3, 
 
 def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, labels, 
                                         LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, 
-                                        deep_sort_tracker, detection_masks, detection_masks_labels, 
-                                        threshold=0.5, rect_th=2, text_size=.75, text_th=2, classname='Object'):
+                                        deep_sort_tracker, detection_masks, detection_masks_labels, event_in_progress=False,
+                                        threshold=0.5, rect_th=2, text_size=.50, text_th=2, classname='Object'):
         
         # if there are no objects detected, we still need to notify the SORT object
         if(len(boxes) == 0):
@@ -196,24 +196,34 @@ def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, la
                 sort_boxes = deep_sort_tracker.update(fix_box_format(boxes),scores,img)
             else:
                 sort_boxes = sort_trackers[classname].update(fix_box_format(boxes))
-        
-        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         label_color_idx = labels.index(classname)
 
+        potential_violators = []
         for i in range(len(masks)):
-            detection_index = 0
-            detection_zones_scores = []
-            for detection_zone in detection_masks:
-                detection = detection_masks_labels[detection_index], classname, dice_metric(masks[i],detection_zone)
-                detection_zones_scores.append(detection)
-                detection_index += 1
+            if(masks[i].ndim > 1):
+                detection_index = 0
+                detection_zones_scores = []
+                for detection_zone in detection_masks:
+                    detection = detection_masks_labels[detection_index], classname, dice_metric(masks[i],detection_zone)
+                    detection_zones_scores.append(detection)
+                    detection_index += 1
 
-            if(is_in_area(detection_zones_scores)):
-                rgb_mask = colour_masks(masks[i], LABEL_COLORS[3])
-            else:
-                rgb_mask = colour_masks(masks[i], LABEL_COLORS[label_color_idx])
-            img = cv2.addWeighted(img, 1, rgb_mask, 0.5, 0)
+                violation_detection = is_in_area(detection_zones_scores, 0.01)
+                if(violation_detection != False):
+                    if(event_in_progress == True):
+                        rgb_mask = colour_masks(masks[i], LABEL_COLORS[7])
+                    else:
+                        if(violation_detection == 'RightOfWay'):
+                            rgb_mask = colour_masks(masks[i], LABEL_COLORS[7])
+                        else:
+                            rgb_mask = colour_masks(masks[i], LABEL_COLORS[3])
+
+                    potential_violators.append(i)
+                else:
+                    rgb_mask = colour_masks(masks[i], LABEL_COLORS[label_color_idx])
+                
+                img = cv2.addWeighted(img, 1, rgb_mask, 0.5, 0)
 
         for i in range(len(sort_boxes)):
             x = (int(sort_boxes[i][0]), int(sort_boxes[i][1]))
