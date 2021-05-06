@@ -21,8 +21,24 @@ import time
 import timeit
 import platform
 import json
+import csv
 import os
 import sys
+
+## 'Unused' imports, required to make pyinstaller included them during compilation
+import scipy
+import av
+from scipy.stats import statlib
+from scipy.integrate import _odepack
+from scipy.interpolate import _fitpack
+from scipy.optimize import linesearch
+import scipy.optimize
+import numpy.core.multiarray
+import torch.onnx.symbolic_opset7
+from scipy.optimize import minpack2
+import scipy.linalg._fblas as fblas
+import scipy.sparse.linalg.isolve.iterative
+
 import cv2
 import torch
 import torchvision
@@ -75,7 +91,7 @@ LABEL_COLORS = [[0, 255, 0],[0, 255, 0],[255, 0, 0],[0, 255, 255],[255, 255, 0],
 
 # Deep Sort Config
 class DEEPSORT_CONFIG_CLASS():
-        REID_CKPT =  "./PhaseTwo/deep_sort/deep/checkpoint/ckpt.t7"
+        REID_CKPT =  "./deep_sort/deep/checkpoint/ckpt.t7"
         MAX_DIST =  0.9
         MIN_CONFIDENCE = 0.4
         NMS_MAX_OVERLAP = 0.8
@@ -94,7 +110,7 @@ try:
 except NameError:
     # device was not set to something, we assume CPU to be more compatible. 
     device = "cpu"
-
+device='cpu'
 device_memory = 0
 if(device != 'cpu'):
     device_memory = torch.cuda.get_device_properties(device).total_memory
@@ -107,6 +123,8 @@ if(device != 'cpu'):
 
 if __name__ == '__main__':
 
+    # Necessary to run compiled on Windows
+    #multiprocessing.freeze_support()
     # Debug data
     print("PyTorch Version: ",torch.__version__)
     print("Torchvision Version: ",torchvision.__version__)
@@ -115,7 +133,7 @@ if __name__ == '__main__':
 
     # Deal with command line arguments.
     parser = argparse.ArgumentParser(description='Process some video files using Machine Learning!')
-    parser.add_argument('--outputpath', '-o',   action='store',     required=False,     default='../temp/fraoutput',        help='Path to the directory where extracted data is stored.')
+    parser.add_argument('--outputpath', '-o',   action='store',     required=False,     default='../../temp/fraoutput',        help='Path to the directory where extracted data is stored.')
     parser.add_argument('--inputpath',  '-i',   action='store',     required=False,     default='/mnt/ml_data/FRA/sourcevideos/ramsey/20180418/Ch02_20180418000000_20180418235959_1e.avi',    help='Path to the extracted video frames in JPG format.')
     args = parser.parse_args()
 
@@ -138,6 +156,27 @@ if __name__ == '__main__':
     def run_model(model, data):
         with torch.no_grad():
             return model(data)
+
+    def create_csv_from_json():
+        with open(Path(args.outputpath) / Path(str(input_filename + '-data.json'))) as json_output:
+            data = json.load(json_output)
+        csv_file = open(Path(args.outputpath) / Path(str(input_filename + '-data.csv')), 'w')
+        writer = csv.writer(csv_file)
+        header = ["frame_number", "frame_timestamp", "label", "bbox"]
+        writer.writerow(header)
+        for frame in data:
+            videoData = frame["video"]
+            trackingData = frame["tracking"]
+            for label in trackingData:
+                if len(trackingData[label][0]) > 0:
+                    for bbox in trackingData[label]:
+                        row = []
+                        row.append(videoData["frame_number"])
+                        row.append(videoData["frame_timestamp"])
+                        row.append(label)
+                        row.append(str(bbox))
+                        writer.writerow(row)
+        csv_file.close()
 
     # def ffmpeg_getinfo(vid_file_path):
 
@@ -210,7 +249,7 @@ if __name__ == '__main__':
 
     # load the grade / right-of-way model
     grade_model = get_model_instance_segmentation(grade_num_classes)
-    grade_model.load_state_dict(torch.load('PhaseTwo/models/gctd_grade-row.pt'))
+    grade_model.load_state_dict(torch.load('models/gctd_grade-row.pt', map_location=torch.device('cpu')))
     grade_model.eval()
     grade_model.to(device)
 
@@ -245,6 +284,8 @@ if __name__ == '__main__':
     # tabular and video data output
     input_filename, ext = os.path.splitext(os.path.basename(args.inputpath))
     dataoutput = open(Path(args.outputpath) / Path(str(input_filename + '-data.json')), 'w')
+    dataoutput.write('[\n')
+    dataoutput.flush()
 
     output_filename = str(Path(args.outputpath) / Path(str(input_filename) + '-processed.mp4'))
     video, audio, info, video_idx = video_clips.get_clip(0)
@@ -315,8 +356,8 @@ if __name__ == '__main__':
 
             video_timestamp = datetime.timedelta(seconds=video_timestamp)
             video_data = {}
-            video_data['frame_number'] = str(framecount)
-            video_data['frame_timestamp'] = str(video_timestamp)
+            video_data["frame_number"] = str(framecount)
+            video_data["frame_timestamp"] = str(video_timestamp)
 
             # setup our images
             org_image1 = pil_to_cv(org_image_stack[n])
@@ -357,9 +398,18 @@ if __name__ == '__main__':
 
             # write out the JSON
             combined_output = {}
-            combined_output.update({'video':video_data})
-            combined_output.update({'tracking':boxes_by_label})
-            dataoutput.write(str(combined_output) + '\n')
+            combined_output.update({"video":video_data})
+            combined_output.update({"tracking":boxes_by_label})
+            # combined_output.update({'roadway':road_output})
+            # End our JSON line with a comma, unless this is the last one
+            lineEnd = ',\n'
+            if (n == len(road_annotations)-1 and chunk == video_clips.num_clips() - 1):
+                lineEnd = '\n'
+            # Replace characters in str output to make this valid JSON
+            outputline = (str(combined_output) + lineEnd).replace("'", '"')
+            outputline = outputline.replace("(", "\"(")
+            outputline = outputline.replace(")", ")\"")
+            dataoutput.write(outputline)
             dataoutput.flush()
 
             framecount += 1
@@ -369,9 +419,11 @@ if __name__ == '__main__':
         del road_img
         del road_annotations
 
+    dataoutput.write('\n]')
+    dataoutput.flush()
     dataoutput.close()
     video_out.release() 
-
+    create_csv_from_json()
     # Wrap up (might want to remove this once integrated into Electron)
     print(' ')
     stop = timeit.default_timer()

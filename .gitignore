@@ -141,6 +141,9 @@ PhaseTwo/Scripts
 PhaseTwo/share
 PhaseTwo/pyvenv.cfg
 
+# Model
+PhaseTwo/models
+
 # Temp
 temp
 

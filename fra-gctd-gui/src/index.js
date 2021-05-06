@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell} = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell} = require('electron');
 const path = require('path');
 const SettingsManager = require('./main-process/settingsManager');
 
@@ -23,9 +23,7 @@ const createWindow = () => {
   // and load the index.html of the app.
   mainWindow.loadFile(path.join(__dirname, 'index.html'), 
                       {query: {"outputDir": global.settings.get("outputDir")}});
-
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  Menu.setApplicationMenu(null);
 };
 
 // This method will be called when Electron has finished
