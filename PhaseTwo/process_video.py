@@ -48,16 +48,16 @@ sort_ios_threshold = .1
 boxes_thickness = 1
 boxes_text_size = 1
 boxes_text_thickness = 1
-batch_size = 12
-num_of_workers = 2
+batch_size = 24
+num_of_workers = 4
 force_video_fps = 0
 force_video_width = None
 force_video_height = 480
 
 # grade / right-of-way segmentation model settings
-grade_num_classes = 2
+grade_num_classes = 3
 GRADE_CATEGORY_NAMES = [
-    'GradeCrossing', 'RightOfWay'
+    '__background__', 'GradeCrossing', 'RightOfWay'
 ]
 GRADE_LABEL_COLORS = [[0, 0, 255],[0, 255, 0],[255, 0, 0],[0, 255, 255],[255, 255, 0],[255, 0, 255],[80, 70, 180]]
 
@@ -71,7 +71,7 @@ DEEPSORT_LABEL = 'person'
 
 # LABEL_COLORS = [[0, 255, 0],[0, 0, 255],[255, 0, 0],[0, 255, 255],[255, 255, 0],[255, 0, 255],[80, 70, 180],[250, 80, 190],[245, 145, 50],[70, 150, 250],[50, 190, 190]]
 # REMINDER: Label colors are Blue, Green, Red (BGR)
-LABEL_COLORS = [[0, 0, 255],[0, 255, 0],[255, 0, 0],[0, 255, 255],[255, 255, 0],[255, 0, 255],[80, 70, 180]]
+LABEL_COLORS = [[0, 255, 0],[0, 255, 0],[255, 0, 0],[0, 255, 255],[255, 255, 0],[255, 0, 255],[80, 70, 180],[0, 0, 255]]
 
 # Deep Sort Config
 class DEEPSORT_CONFIG_CLASS():
@@ -88,7 +88,7 @@ DEEPSORT_CONFIG = DEEPSORT_CONFIG_CLASS()
 # -------------------------------------------------------------
 
 # Detect if we have a GPU available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 try:
     device
 except NameError:
@@ -98,6 +98,10 @@ except NameError:
 device_memory = 0
 if(device != 'cpu'):
     device_memory = torch.cuda.get_device_properties(device).total_memory
+    # device_memory_reserved = torch.cuda.memory_reserved(device) 
+    # device_memory_allocated = torch.cuda.memory_allocated(device)
+    # device_memory_free = device_memory_reserved - device_memory_allocated  # free inside reserved
+    
 #     torch.backends.cudnn.benchmark = True
 #     torch.backends.cudnn.enabled = True
 
@@ -289,7 +293,7 @@ if __name__ == '__main__':
             grade_segmented = True
 
             # upload the model since we are done with it
-            del grade_model
+            # del grade_model
         
 
         # get the model predictions / annotations
@@ -318,8 +322,10 @@ if __name__ == '__main__':
             org_image1 = pil_to_cv(org_image_stack[n])
 
             # create JSON output
+            is_annotation = False
             if ([i for i in road_annotation['scores'] if i >= segmentation_threshold]):
                 road_masks, road_boxes, road_labels, road_scores = parse_seg_prediction(road_annotation, segmentation_threshold, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES)
+                is_annotation = True
 
             road_img = org_image1
 
@@ -327,24 +333,24 @@ if __name__ == '__main__':
             # road_img = cv2.cvtColor(road_img, cv2.COLOR_BGR2RGB)
             
             boxes_by_label = {}
-            for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
-                collected_boxes = []
-                collected_masks = []
-                collected_labels = []
-                collected_scores = []
-                idx = 0
-                for road_label in road_labels:
-                    if(label == road_label):
-                        collected_boxes.append(road_boxes[idx])
-                        collected_masks.append(road_masks[idx])
-                        collected_labels.append(road_labels[idx])
-                        collected_scores.append(road_scores[idx])
-                    idx += 1
-                road_img, grade_masks = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
-                detect_object_overlap(grade_masks,GRADE_CATEGORY_NAMES,collected_masks,collected_labels)
-                road_img = instance_segmentation_visualize_sort(road_img, collected_masks, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
-                new_line = [collected_boxes]
-                boxes_by_label[label] = new_line
+            if is_annotation == True:
+                for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
+                    collected_boxes = []
+                    collected_masks = []
+                    collected_labels = []
+                    collected_scores = []
+                    idx = 0
+                    for road_label in road_labels:
+                        if(label == road_label):
+                            collected_boxes.append(road_boxes[idx])
+                            collected_masks.append(road_masks[idx])
+                            collected_labels.append(road_labels[idx])
+                            collected_scores.append(road_scores[idx])
+                        idx += 1
+                    road_img, grade_masks = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
+                    road_img = instance_segmentation_visualize_sort(road_img, collected_masks, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
+                    new_line = [collected_boxes]
+                    boxes_by_label[label] = new_line
             
             # save the video to disk
             video_out.write(road_img)
@@ -353,7 +359,6 @@ if __name__ == '__main__':
             combined_output = {}
             combined_output.update({'video':video_data})
             combined_output.update({'tracking':boxes_by_label})
-            # combined_output.update({'roadway':road_output})
             dataoutput.write(str(combined_output) + '\n')
             dataoutput.flush()
 
