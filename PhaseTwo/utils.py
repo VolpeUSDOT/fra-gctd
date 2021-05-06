@@ -15,6 +15,7 @@
 
 # import modules
 import cv2
+import csv
 import numpy as np
 from numpy.core.arrayprint import format_float_scientific
 import torchvision
@@ -170,7 +171,7 @@ def fix_box_format(boxes):
         new_boxes.append(line)
     return np.array(new_boxes)
 
-def instance_segmentation_visualize(img, predictions, threshold=0.5, rect_th=3, text_size=1, text_th=2):
+def instance_segmentation_visualize(img, predictions, LABEL_COLORS, threshold=0.5, rect_th=3, text_size=1, text_th=2):
     masks, boxes, pred_cls = parse_seg_prediction(predictions, threshold)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     for i in range(len(masks)):
