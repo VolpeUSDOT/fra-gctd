@@ -8,7 +8,7 @@
 ## Copyright: Copyright 2020, Volpe National Transportation Systems Center
 ## Credits: <add reference to SORT & Deep SORT here>
 ## License: MIT
-## Version: 0.0.2
+## Version: 0.0.5
 ## Mmaintainer: Robert Rittmuller
 ## Email: robert.rittmuller@dot.gov
 ## Status: Active Development
