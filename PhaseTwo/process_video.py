@@ -72,7 +72,7 @@ force_video_width = None
 force_video_height = 480
 
 # grade / right-of-way segmentation model settings
-grade_num_classes = 3
+grade_num_classes = 2
 GRADE_CATEGORY_NAMES = [
     '__background__', 'GradeCrossing', 'RightOfWay'
 ]
@@ -258,7 +258,11 @@ if __name__ == '__main__':
 
     # load the grade / right-of-way model
     grade_model = get_model_instance_segmentation(grade_num_classes)
-    grade_model.load_state_dict(torch.load('models/gctd_grade-row.pt', map_location=torch.device('cpu')))
+    if(device != 'cpu'):
+        grade_model.load_state_dict(torch.load('models/gctd_grade-row.pt'))
+    else: 
+        grade_model.load_state_dict(torch.load('models/gctd_grade-row.pt', map_location=torch.device('cpu')))
+        
     grade_model.eval()
     grade_model.to(device)
 
