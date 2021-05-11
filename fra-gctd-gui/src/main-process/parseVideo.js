@@ -48,7 +48,7 @@ function startProcess(video) {
     }
     
     var child = execFile("process_video.exe", 
-                        ['--inputpath', video.path, '--outputpath', outputPath], 
+                        ['--inputpath', video.path, '--outputpath', outputPath, '--cpu'], 
                         {cwd : processDir});
 
     child.stdout.on('data', function(data) {
