@@ -181,7 +181,61 @@ def instance_segmentation_visualize(img, predictions, LABEL_COLORS, threshold=0.
         cv2.putText(img,pred_cls[i], boxes[i][0], cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0),thickness=text_th)
     return img
 
-def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, labels, 
+# def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, labels, 
+#                                         LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, 
+#                                         deep_sort_tracker, detection_masks, detection_masks_labels, event_in_progress=False,
+#                                         threshold=0.5, rect_th=2, text_size=.50, text_th=2, classname='Object'):
+        
+#         # if there are no objects detected, we still need to notify the SORT object
+#         if(len(boxes) == 0):
+#             if classname == DEEPSORT_LABEL:
+#                 sort_boxes = []
+#             else:
+#                 sort_boxes = sort_trackers[classname].update()
+#         else:
+#             if classname == DEEPSORT_LABEL:
+#                 sort_boxes = deep_sort_tracker.update(fix_box_format(boxes),scores,img)
+#             else:
+#                 sort_boxes = sort_trackers[classname].update(fix_box_format(boxes))
+
+#         label_color_idx = labels.index(classname)
+
+#         potential_violators = []
+#         for i in range(len(masks)):
+#             if(masks[i].ndim > 1):
+#                 detection_index = 0
+#                 detection_zones_scores = []
+#                 for detection_zone in detection_masks:
+#                     detection = detection_masks_labels[detection_index], classname, dice_metric(masks[i],detection_zone)
+#                     detection_zones_scores.append(detection)
+#                     detection_index += 1
+
+#                 violation_detection = is_in_area(detection_zones_scores, 0.01)
+#                 if(violation_detection != False):
+#                     if(event_in_progress == True):
+#                         rgb_mask = colour_masks(masks[i], LABEL_COLORS[7])
+#                     else:
+#                         if(violation_detection == 'RightOfWay'):
+#                             rgb_mask = colour_masks(masks[i], LABEL_COLORS[7])
+#                         else:
+#                             rgb_mask = colour_masks(masks[i], LABEL_COLORS[3])
+
+#                     potential_violators.append(i)
+#                 else:
+#                     rgb_mask = colour_masks(masks[i], LABEL_COLORS[label_color_idx])
+                
+#                 img = cv2.addWeighted(img, 1, rgb_mask, 0.5, 0)
+
+#         for i in range(len(sort_boxes)):
+#             x = (int(sort_boxes[i][0]), int(sort_boxes[i][1]))
+#             y = (int(sort_boxes[i][2]), int(sort_boxes[i][3]))
+#             # if(is_in_area(detection_zones_scores)):
+#             cv2.rectangle(img,x, y,color=(0, 255, 0), thickness=rect_th)
+#             cv2.putText(img, str(classname) + ' #' + str(int(sort_boxes[i][4])), (int(sort_boxes[i][0]), int(sort_boxes[i][1])), cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0), thickness=text_th)
+        
+#         return img
+
+def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, labels, event_detections,
                                         LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, 
                                         deep_sort_tracker, detection_masks, detection_masks_labels, event_in_progress=False,
                                         threshold=0.5, rect_th=2, text_size=.50, text_th=2, classname='Object'):
@@ -200,17 +254,9 @@ def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, la
 
         label_color_idx = labels.index(classname)
 
-        potential_violators = []
         for i in range(len(masks)):
             if(masks[i].ndim > 1):
-                detection_index = 0
-                detection_zones_scores = []
-                for detection_zone in detection_masks:
-                    detection = detection_masks_labels[detection_index], classname, dice_metric(masks[i],detection_zone)
-                    detection_zones_scores.append(detection)
-                    detection_index += 1
-
-                violation_detection = is_in_area(detection_zones_scores, 0.01)
+                violation_detection = event_detections[i]
                 if(violation_detection != False):
                     if(event_in_progress == True):
                         rgb_mask = colour_masks(masks[i], LABEL_COLORS[7])
@@ -219,8 +265,6 @@ def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, la
                             rgb_mask = colour_masks(masks[i], LABEL_COLORS[7])
                         else:
                             rgb_mask = colour_masks(masks[i], LABEL_COLORS[3])
-
-                    potential_violators.append(i)
                 else:
                     rgb_mask = colour_masks(masks[i], LABEL_COLORS[label_color_idx])
                 
@@ -234,6 +278,19 @@ def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, la
             cv2.putText(img, str(classname) + ' #' + str(int(sort_boxes[i][4])), (int(sort_boxes[i][0]), int(sort_boxes[i][1])), cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0), thickness=text_th)
         
         return img
+
+def get_event_detections(masks, detection_masks, detection_masks_labels, classname='Object'):
+    all_events = [False] * len(masks)
+    for i in range(len(masks)):
+        if(masks[i].ndim > 1):
+            detection_index = 0
+            detection_zones_scores = []
+            for detection_zone in detection_masks:
+                detection = detection_masks_labels[detection_index], classname, dice_metric(masks[i],detection_zone)
+                detection_zones_scores.append(detection)
+                detection_index += 1
+            all_events[i] = is_in_area(detection_zones_scores, 0.01)
+    return all_events          
 
 def get_model_instance_segmentation(num_classes):
     # load an instance segmentation model pre-trained pre-trained on COCO

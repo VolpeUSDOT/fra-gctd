@@ -50,7 +50,7 @@ from pathlib import Path
 from hurry.filesize import size, si
 from sort import *
 from deep_sort import build_tracker
-from utils import image_resize, pil_to_cv, parse_seg_prediction, instance_segmentation_visualize_sort, get_model_instance_segmentation, instance_grade_segmentation_visualize, detect_object_overlap
+from utils import get_event_detections, image_resize, pil_to_cv, parse_seg_prediction, instance_segmentation_visualize_sort, get_model_instance_segmentation, instance_grade_segmentation_visualize, detect_object_overlap
 
 # -------------------------------------------------------------
 # Configuration settings
@@ -300,6 +300,11 @@ if __name__ == '__main__':
     dataoutput.write('[\n')
     dataoutput.flush()
 
+    event_output = open(Path(args.outputpath) / Path(str(input_filename + '-events.csv')), 'w')
+    event_writer = csv.writer(event_output)
+    header = ["frame_number", "frame_timestamp", "label", "bbox"]
+    event_writer.writerow(header)
+
     output_filename = str(Path(args.outputpath) / Path(str(input_filename) + '-processed.mp4'))
     video, audio, info, video_idx = video_clips.get_clip(0)
     
@@ -402,7 +407,8 @@ if __name__ == '__main__':
                             collected_scores.append(road_scores[idx])
                         idx += 1
                     road_img, grade_masks = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
-                    road_img = instance_segmentation_visualize_sort(road_img, collected_masks, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
+                    event_detections = get_event_detections(collected_masks, grade_masks,  GRADE_CATEGORY_NAMES, label)
+                    road_img = instance_segmentation_visualize_sort(road_img, collected_masks, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
                     new_line = [collected_boxes]
                     boxes_by_label[label] = new_line
             
