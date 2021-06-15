@@ -50,7 +50,7 @@ from pathlib import Path
 from hurry.filesize import size, si
 from sort import *
 from deep_sort import build_tracker
-from utils import get_event_detections, image_resize, pil_to_cv, parse_seg_prediction, instance_segmentation_visualize_sort, get_model_instance_segmentation, instance_grade_segmentation_visualize, detect_object_overlap
+from utils import get_event_detections, image_resize, pil_to_cv, parse_seg_prediction, instance_segmentation_visualize_sort, get_model_instance_segmentation, instance_grade_segmentation_visualize, detect_object_overlap, update_sort
 
 # -------------------------------------------------------------
 # Configuration settings
@@ -407,17 +407,18 @@ if __name__ == '__main__':
                             collected_scores.append(road_scores[idx])
                         idx += 1
                     road_img, grade_masks = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
-                    event_detections = get_event_detections(collected_masks, grade_masks,  GRADE_CATEGORY_NAMES, label)
+                    sort_boxes = update_sort(road_img, collected_boxes, collected_scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname=label)
+                    event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  GRADE_CATEGORY_NAMES, sort_boxes, label)
                     # output all events in current frame
                     for evt in event_detections:
-                        if evt != False:
+                        if evt != False and label != "train":
                             row = []
                             row.append(video_data["frame_number"])
                             row.append(video_data["frame_timestamp"])
                             row.append(label)
                             row.append(evt)
                             event_writer.writerow(row)
-                    road_img = instance_segmentation_visualize_sort(road_img, collected_masks, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
+                    road_img = instance_segmentation_visualize_sort(road_img, collected_masks, sort_boxes, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
                     new_line = [collected_boxes]
                     boxes_by_label[label] = new_line
             

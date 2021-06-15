@@ -235,22 +235,24 @@ def instance_segmentation_visualize(img, predictions, LABEL_COLORS, threshold=0.
         
 #         return img
 
-def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, labels, event_detections,
+def update_sort(img, boxes, scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname='Object'):
+    # if there are no objects detected, we still need to notify the SORT object
+    if(len(boxes) == 0):
+        if classname == DEEPSORT_LABEL:
+            sort_boxes = []
+        else:
+            sort_boxes = sort_trackers[classname].update()
+    else:
+        if classname == DEEPSORT_LABEL:
+            sort_boxes = deep_sort_tracker.update(fix_box_format(boxes),scores,img)
+        else:
+            sort_boxes = sort_trackers[classname].update(fix_box_format(boxes))
+    return sort_boxes
+        
+def instance_segmentation_visualize_sort(img, masks, sort_boxes, boxes, pred_cls, scores, labels, event_detections,
                                         LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, 
                                         deep_sort_tracker, detection_masks, detection_masks_labels, event_in_progress=False,
                                         threshold=0.5, rect_th=2, text_size=.50, text_th=2, classname='Object'):
-        
-        # if there are no objects detected, we still need to notify the SORT object
-        if(len(boxes) == 0):
-            if classname == DEEPSORT_LABEL:
-                sort_boxes = []
-            else:
-                sort_boxes = sort_trackers[classname].update()
-        else:
-            if classname == DEEPSORT_LABEL:
-                sort_boxes = deep_sort_tracker.update(fix_box_format(boxes),scores,img)
-            else:
-                sort_boxes = sort_trackers[classname].update(fix_box_format(boxes))
 
         label_color_idx = labels.index(classname)
 
@@ -279,8 +281,13 @@ def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, la
         
         return img
 
-def get_event_detections(masks, detection_masks, detection_masks_labels, classname='Object'):
+def get_event_detections(masks, boxes, detection_masks, detection_masks_labels, sort_boxes, classname='Object'):
     all_events = [False] * len(masks)
+    if len(masks) != len(sort_boxes):
+        print("Size mismatch for classname " + classname)
+        print("Mask count: " + str(len(masks)))
+        print("Box count: " + str(len(boxes)))
+        print("Sort Box count: " + str(len(sort_boxes)))
     for i in range(len(masks)):
         if(masks[i].ndim > 1):
             detection_index = 0
@@ -290,6 +297,21 @@ def get_event_detections(masks, detection_masks, detection_masks_labels, classna
                 detection_zones_scores.append(detection)
                 detection_index += 1
             all_events[i] = is_in_area(detection_zones_scores, 0.01)
+            #print("ID is " + str(sort_boxes[i][4]))
+            #if all_events[i]:
+            #    print("WOO")
+            #    print(boxes[i])
+            #    x1 = boxes[i][0][0]
+            #    x2 = boxes[i][0][1]
+            #    y1 = boxes[i][1][0]
+            #    y2 = boxes[i][1][1]
+            #    for j in range(len(sort_boxes)):
+            #        sbox = sort_boxes[j]
+            #        print(sbox)
+            #        if abs(sbox[0] - x1) < 1 and abs(sbox[1] - x2) < 1 and abs(sbox[2] - y1) < 1 and abs(sbox[3] - y2) < 1:
+            #            print("BOX FOUND")
+            #            print(str(sbox[4]))
+
     return all_events          
 
 def get_model_instance_segmentation(num_classes):
