@@ -46,6 +46,8 @@ function startProcess(video) {
     if (!fs.existsSync(outputPath)){
         fs.mkdirSync(outputPath);
     }
+    var logfile = path.join(outputPath, "process-log.txt");
+    let writeStream = fs.createWriteStream(logfile);
     
     var child = execFile("process_video.exe", 
                         ['--inputpath', video.path, '--outputpath', outputPath, '--cpu'], 
@@ -53,6 +55,7 @@ function startProcess(video) {
 
     child.stdout.on('data', function(data) {
         // Grab output from the script, and push completion percentage to the renderer
+        writeStream.write(data);
         if (data.match("Processing:.*\% complete"))
             updateStatus(video.id, data.match("Processing:.*\% complete")[0], video.sender);
         else if (data.match("Total running time: .*")) {
@@ -69,6 +72,7 @@ function startProcess(video) {
 
     // When the process is complete, start the next one
     child.on('close', function() {
+        writeStream.close();
         console.log("Closed video " + video.name);
         video.status = "Complete";
         videosProcessed.push(video);
@@ -80,6 +84,12 @@ function startProcess(video) {
             videoInProcess = nextVideo;
             startProcess(nextVideo);
         }
+    });
+
+    child.on('exit', function(code) {
+        writeStream.close();
+        if (code != 0)
+            updateStatus(video.id, "Process stopped unexpectedly", video.sender);
     });
 }
 
