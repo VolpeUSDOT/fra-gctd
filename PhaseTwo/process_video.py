@@ -276,9 +276,10 @@ if __name__ == '__main__':
 
     # setup regular SORT tracking
     sort_trackers = {}
+    event_trackers = {}
     for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
         sort_trackers[label] = Sort(max_age=sort_max_age, min_hits=sort_min_hits, iou_threshold=sort_ios_threshold)
-
+        event_trackers[label] = []
     # setup deep sort tracking for people label
     deep_sort_tracker = build_tracker(DEEPSORT_CONFIG, use_cuda=device)
 
@@ -302,7 +303,7 @@ if __name__ == '__main__':
 
     event_output = open(Path(args.outputpath) / Path(str(input_filename + '-events.csv')), 'w')
     event_writer = csv.writer(event_output)
-    header = ["frame_number", "frame_timestamp", "label", "event_type"]
+    header = ["label", "object_id", "event_type", "start_timestamp", "end_timestamp"]
     event_writer.writerow(header)
 
     output_filename = str(Path(args.outputpath) / Path(str(input_filename) + '-processed.mp4'))
@@ -408,16 +409,16 @@ if __name__ == '__main__':
                         idx += 1
                     road_img, grade_masks = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
                     sort_boxes = update_sort(road_img, collected_boxes, collected_scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname=label)
-                    event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  GRADE_CATEGORY_NAMES, sort_boxes, label)
+                    event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  GRADE_CATEGORY_NAMES, sort_boxes, event_trackers, video_data["frame_timestamp"], label)
                     # output all events in current frame
-                    for evt in event_detections:
-                        if evt != False and label != "train":
-                            row = []
-                            row.append(video_data["frame_number"])
-                            row.append(video_data["frame_timestamp"])
-                            row.append(label)
-                            row.append(evt)
-                            event_writer.writerow(row)
+                    # for evt in event_detections:
+                    #     if evt != False and label != "train":
+                    #         row = []
+                    #         row.append(video_data["frame_number"])
+                    #         row.append(video_data["frame_timestamp"])
+                    #         row.append(label)
+                    #         row.append(evt)
+                    #         event_writer.writerow(row)
                     road_img = instance_segmentation_visualize_sort(road_img, collected_masks, sort_boxes, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
                     new_line = [collected_boxes]
                     boxes_by_label[label] = new_line
@@ -451,6 +452,17 @@ if __name__ == '__main__':
     dataoutput.write('\n]')
     dataoutput.flush()
     dataoutput.close()
+
+    for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
+        for event in event_trackers[label]:
+            ["label", "object_id", "event_type", "start_timestamp", "end_timestamp"]
+            row = []
+            row.append(event["label"])
+            row.append(event["id"])
+            row.append(event["evt_type"])
+            row.append(event["start_time"])
+            row.append(event["stop_time"])
+            event_writer.writerow(row)
     event_output.close()
     video_out.release() 
     create_csv_from_json()

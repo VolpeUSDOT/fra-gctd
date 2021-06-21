@@ -49,7 +49,8 @@ class DeepSort(object):
             box = track.to_tlwh()
             x1,y1,x2,y2 = self._tlwh_to_xyxy(box)
             track_id = track.track_id
-            outputs.append(np.array([x1,y1,x2,y2,track_id], dtype=np.int))
+            id = track.orig_index
+            outputs.append(np.array([x1,y1,x2,y2,track_id,id], dtype=np.int))
         if len(outputs) > 0:
             outputs = np.stack(outputs,axis=0)
         return outputs
@@ -72,12 +73,12 @@ class DeepSort(object):
 
 
     def _xywh_to_xyxy(self, bbox_xywh):
-        x,y,w,h = bbox_xywh
+        x,y,w,h,id = bbox_xywh
         # x1 = max(int(x-w/2),0)
         # x2 = min(int(x+w/2),self.width-1)
         # y1 = max(int(y-h/2),0)
         # y2 = min(int(y+h/2),self.height-1)
-        return int(x),int(y),int(w),int(h)
+        return int(x),int(y),int(w),int(h),id
         # return x1,y1,x2,y2
 
     def _tlwh_to_xyxy(self, bbox_tlwh):
@@ -108,7 +109,7 @@ class DeepSort(object):
 
         for box in bbox_xyxy:
             bbox = []
-            x1,y1,x2,y2 = self._xywh_to_xyxy(box)
+            x1,y1,x2,y2,id = self._xywh_to_xyxy(box)
 
             t = x1
             l = y1
@@ -118,6 +119,7 @@ class DeepSort(object):
             bbox.append(l)
             bbox.append(w)
             bbox.append(h)
+            bbox.append(id)
             bbox_tlwh.append(bbox)
 
         return bbox_tlwh
@@ -125,7 +127,7 @@ class DeepSort(object):
     def _get_features(self, bbox_xywh, ori_img):
         im_crops = []
         for box in bbox_xywh:
-            x1,y1,x2,y2 = self._xywh_to_xyxy(box)
+            x1,y1,x2,y2,id = self._xywh_to_xyxy(box)
             im = ori_img[y1:y2,x1:x2]
             im_crops.append(im)
         if im_crops:

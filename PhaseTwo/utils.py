@@ -163,11 +163,14 @@ def colour_masks(image, color):
 
 def fix_box_format(boxes):
     new_boxes = []
+    i = 0
     for box in boxes:
         line = []
         for value in box:
             for subvalue in value:
                 line.append(subvalue)
+        line.append(i)
+        i += 1
         new_boxes.append(line)
     return np.array(new_boxes)
 
@@ -281,13 +284,14 @@ def instance_segmentation_visualize_sort(img, masks, sort_boxes, boxes, pred_cls
         
         return img
 
-def get_event_detections(masks, boxes, detection_masks, detection_masks_labels, sort_boxes, classname='Object'):
+def get_event_detections(masks, boxes, detection_masks, detection_masks_labels, sort_boxes, event_trackers, frame_timestamp, classname='Object'):
     all_events = [False] * len(masks)
-    if len(masks) != len(sort_boxes):
-        print("Size mismatch for classname " + classname)
-        print("Mask count: " + str(len(masks)))
-        print("Box count: " + str(len(boxes)))
-        print("Sort Box count: " + str(len(sort_boxes)))
+    evts = event_trackers[classname]
+    #if len(masks) != len(sort_boxes):
+    #    print("Size mismatch for classname " + classname)
+    #    print("Mask count: " + str(len(masks)))
+    #    print("Box count: " + str(len(boxes)))
+    #    print("Sort Box count: " + str(len(sort_boxes)))
     for i in range(len(masks)):
         if(masks[i].ndim > 1):
             detection_index = 0
@@ -298,19 +302,36 @@ def get_event_detections(masks, boxes, detection_masks, detection_masks_labels, 
                 detection_index += 1
             all_events[i] = is_in_area(detection_zones_scores, 0.01)
             #print("ID is " + str(sort_boxes[i][4]))
-            #if all_events[i]:
-            #    print("WOO")
-            #    print(boxes[i])
-            #    x1 = boxes[i][0][0]
-            #    x2 = boxes[i][0][1]
-            #    y1 = boxes[i][1][0]
-            #    y2 = boxes[i][1][1]
-            #    for j in range(len(sort_boxes)):
-            #        sbox = sort_boxes[j]
-            #        print(sbox)
-            #        if abs(sbox[0] - x1) < 1 and abs(sbox[1] - x2) < 1 and abs(sbox[2] - y1) < 1 and abs(sbox[3] - y2) < 1:
-            #            print("BOX FOUND")
-            #            print(str(sbox[4]))
+            if all_events[i]:
+                object_id = -1
+                for j in range(len(sort_boxes)):
+                    sbox = sort_boxes[j]
+                    if i == sbox[5]:
+                        object_id = sbox[4]
+                        break
+                if object_id == -1:
+                    # We aren't able to track this event. 
+                    event = {}
+                    event["id"] = -1
+                    event["start_time"] = frame_timestamp
+                    event["stop_time"] = frame_timestamp
+                    event["label"] = classname
+                    event["evt_type"] = all_events[i]
+                else:
+                    found = False
+                    for e in evts:
+                        if e["id"] == object_id:
+                            found = True
+                            e["stop_time"] = frame_timestamp
+                            break
+                    if not found:
+                        event = {}
+                        event["id"] = object_id
+                        event["start_time"] = frame_timestamp
+                        event["stop_time"] = frame_timestamp
+                        event["label"] = classname
+                        event["evt_type"] = all_events[i]
+                        evts.append(event)
 
     return all_events          
 
