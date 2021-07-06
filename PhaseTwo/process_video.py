@@ -407,9 +407,9 @@ if __name__ == '__main__':
                             collected_labels.append(road_labels[idx])
                             collected_scores.append(road_scores[idx])
                         idx += 1
-                    road_img, grade_masks = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
+                    road_img, grade_masks, grade_cls = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
                     sort_boxes = update_sort(road_img, collected_boxes, collected_scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname=label)
-                    event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  GRADE_CATEGORY_NAMES, sort_boxes, event_trackers, video_data["frame_timestamp"], label)
+                    event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  grade_cls, sort_boxes, event_trackers, video_data["frame_timestamp"], label)
                     # output all events in current frame
                     # for evt in event_detections:
                     #     if evt != False and label != "train":

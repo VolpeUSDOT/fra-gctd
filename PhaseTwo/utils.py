@@ -287,11 +287,6 @@ def instance_segmentation_visualize_sort(img, masks, sort_boxes, boxes, pred_cls
 def get_event_detections(masks, boxes, detection_masks, detection_masks_labels, sort_boxes, event_trackers, frame_timestamp, classname='Object'):
     all_events = [False] * len(masks)
     evts = event_trackers[classname]
-    #if len(masks) != len(sort_boxes):
-    #    print("Size mismatch for classname " + classname)
-    #    print("Mask count: " + str(len(masks)))
-    #    print("Box count: " + str(len(boxes)))
-    #    print("Sort Box count: " + str(len(sort_boxes)))
     for i in range(len(masks)):
         if(masks[i].ndim > 1):
             detection_index = 0
@@ -392,4 +387,4 @@ def instance_grade_segmentation_visualize(img, predictions, CATEGORY_NAMES, LABE
         img = cv2.addWeighted(img, 1, rgb_mask, .02, 0)
         # cv2.rectangle(img, boxes[i][0], boxes[i][1],color=(0, 255, 0), thickness=rect_th)
         # cv2.putText(img,pred_cls[i], boxes[i][0], cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0),thickness=text_th)
-    return img, masks
+    return img, masks, pred_cls
