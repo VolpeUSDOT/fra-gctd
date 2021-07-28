@@ -67,7 +67,7 @@ function startProcess(video) {
     });
 
     child.stderr.on('data', function(data) {
-        console.log("Error", data);
+        writeStream.write(data);
     });
 
     // When the process is complete, start the next one

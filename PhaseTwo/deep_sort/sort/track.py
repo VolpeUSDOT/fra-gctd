@@ -64,7 +64,8 @@ class Track:
     """
 
     def __init__(self, mean, covariance, track_id, n_init, max_age,
-                 feature=None):
+                 feature=None, orig_index=-1):
+        self.orig_index = orig_index
         self.mean = mean
         self.covariance = covariance
         self.track_id = track_id
@@ -138,7 +139,7 @@ class Track:
         self.mean, self.covariance = kf.update(
             self.mean, self.covariance, detection.to_xyah())
         self.features.append(detection.feature)
-
+        self.orig_index = detection.orig_index
         self.hits += 1
         self.time_since_update = 0
         if self.state == TrackState.Tentative and self.hits >= self._n_init:

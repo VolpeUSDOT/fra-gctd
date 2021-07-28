@@ -163,11 +163,14 @@ def colour_masks(image, color):
 
 def fix_box_format(boxes):
     new_boxes = []
+    i = 0
     for box in boxes:
         line = []
         for value in box:
             for subvalue in value:
                 line.append(subvalue)
+        line.append(i)
+        i += 1
         new_boxes.append(line)
     return np.array(new_boxes)
 
@@ -235,22 +238,24 @@ def instance_segmentation_visualize(img, predictions, LABEL_COLORS, threshold=0.
         
 #         return img
 
-def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, labels, event_detections,
+def update_sort(img, boxes, scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname='Object'):
+    # if there are no objects detected, we still need to notify the SORT object
+    if(len(boxes) == 0):
+        if classname == DEEPSORT_LABEL:
+            sort_boxes = []
+        else:
+            sort_boxes = sort_trackers[classname].update()
+    else:
+        if classname == DEEPSORT_LABEL:
+            sort_boxes = deep_sort_tracker.update(fix_box_format(boxes),scores,img)
+        else:
+            sort_boxes = sort_trackers[classname].update(fix_box_format(boxes))
+    return sort_boxes
+        
+def instance_segmentation_visualize_sort(img, masks, sort_boxes, boxes, pred_cls, scores, labels, event_detections,
                                         LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, 
                                         deep_sort_tracker, detection_masks, detection_masks_labels, event_in_progress=False,
                                         threshold=0.5, rect_th=2, text_size=.50, text_th=2, classname='Object'):
-        
-        # if there are no objects detected, we still need to notify the SORT object
-        if(len(boxes) == 0):
-            if classname == DEEPSORT_LABEL:
-                sort_boxes = []
-            else:
-                sort_boxes = sort_trackers[classname].update()
-        else:
-            if classname == DEEPSORT_LABEL:
-                sort_boxes = deep_sort_tracker.update(fix_box_format(boxes),scores,img)
-            else:
-                sort_boxes = sort_trackers[classname].update(fix_box_format(boxes))
 
         label_color_idx = labels.index(classname)
 
@@ -279,8 +284,9 @@ def instance_segmentation_visualize_sort(img, masks, boxes, pred_cls, scores, la
         
         return img
 
-def get_event_detections(masks, detection_masks, detection_masks_labels, classname='Object'):
+def get_event_detections(masks, boxes, detection_masks, detection_masks_labels, sort_boxes, event_trackers, frame_timestamp, classname='Object'):
     all_events = [False] * len(masks)
+    evts = event_trackers[classname]
     for i in range(len(masks)):
         if(masks[i].ndim > 1):
             detection_index = 0
@@ -290,6 +296,38 @@ def get_event_detections(masks, detection_masks, detection_masks_labels, classna
                 detection_zones_scores.append(detection)
                 detection_index += 1
             all_events[i] = is_in_area(detection_zones_scores, 0.01)
+            #print("ID is " + str(sort_boxes[i][4]))
+            if all_events[i]:
+                object_id = -1
+                for j in range(len(sort_boxes)):
+                    sbox = sort_boxes[j]
+                    if i == sbox[5]:
+                        object_id = sbox[4]
+                        break
+                if object_id == -1:
+                    # We aren't able to track this event. 
+                    event = {}
+                    event["id"] = -1
+                    event["start_time"] = frame_timestamp
+                    event["stop_time"] = frame_timestamp
+                    event["label"] = classname
+                    event["evt_type"] = all_events[i]
+                else:
+                    found = False
+                    for e in evts:
+                        if e["id"] == object_id:
+                            found = True
+                            e["stop_time"] = frame_timestamp
+                            break
+                    if not found:
+                        event = {}
+                        event["id"] = object_id
+                        event["start_time"] = frame_timestamp
+                        event["stop_time"] = frame_timestamp
+                        event["label"] = classname
+                        event["evt_type"] = all_events[i]
+                        evts.append(event)
+
     return all_events          
 
 def get_model_instance_segmentation(num_classes):
@@ -349,4 +387,4 @@ def instance_grade_segmentation_visualize(img, predictions, CATEGORY_NAMES, LABE
         img = cv2.addWeighted(img, 1, rgb_mask, .02, 0)
         # cv2.rectangle(img, boxes[i][0], boxes[i][1],color=(0, 255, 0), thickness=rect_th)
         # cv2.putText(img,pred_cls[i], boxes[i][0], cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0),thickness=text_th)
-    return img, masks
+    return img, masks, pred_cls
