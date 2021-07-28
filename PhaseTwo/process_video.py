@@ -5,13 +5,9 @@
 ## MIT License
 ##################################################
 ## Author: Robert Rittmuller
-## Copyright: Copyright 2020, Volpe National Transportation Systems Center
-## Credits: <add reference to SORT & Deep SORT here>
+## Copyright: Copyright 2021, Volpe National Transportation Systems Center
 ## License: MIT
-## Version: 0.0.5
-## Mmaintainer: Robert Rittmuller
-## Email: robert.rittmuller@dot.gov
-## Status: Active Development
+## Mmaintainer: Brian Sumner / Robert Rittmuller
 ##################################################
 
 # import random
