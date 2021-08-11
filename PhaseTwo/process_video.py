@@ -1,21 +1,7 @@
-##################################################
-## Script to generate eye/glance tracking videos using 
-## the pre-trained Retinaface computer vision model
-##################################################
-## MIT License
-##################################################
-## Author: Robert Rittmuller
-## Copyright: Copyright 2021, Volpe National Transportation Systems Center
-## License: MIT
-## Mmaintainer: Brian Sumner / Robert Rittmuller
-##################################################
-
-# import random
+from ctypes import resize
 import warnings
 import datetime
-import time
 import timeit
-import platform
 import json
 import csv
 import os
@@ -61,17 +47,22 @@ sort_ios_threshold = .1
 boxes_thickness = 1
 boxes_text_size = 1
 boxes_text_thickness = 1
-batch_size = 24
+batch_size = 32
 num_of_workers = 4
 force_video_fps = 0
 force_video_width = None
 force_video_height = 480
 
+# scene model detection thresholds
+scene_detection_base_th = 3                 # 10 frames before an event is detected
+scene_non_detection_label = 'notrain'       # label indicates no event detected
+
 # grade / right-of-way segmentation model settings
-grade_num_classes = 2
+grade_num_classes = 3
 GRADE_CATEGORY_NAMES = [
     '__background__', 'GradeCrossing', 'RightOfWay'
 ]
+SCENE_LABEL_NAMES = ["activation","notrain","train"]
 GRADE_LABEL_COLORS = [[0, 0, 255],[0, 255, 0],[255, 0, 0],[0, 255, 255],[255, 255, 0],[255, 0, 255],[80, 70, 180]]
 
 # Roadway features model settings
@@ -108,8 +99,9 @@ if __name__ == '__main__':
     # Deal with command line arguments.
     parser = argparse.ArgumentParser(description='Process some video files using Machine Learning!')
     parser.add_argument('--outputpath', '-o',   action='store',         required=False,     default='../../temp/fraoutput',         help='Path to the directory where extracted data is stored.')
-    parser.add_argument('--inputpath',  '-i',   action='store',         required=False,     default='/mnt/ml_data/FRA/sourcevideos/ramsey/20180418/Ch02_20180418000000_20180418235959_1e.avi',    help='Path to the extracted video frames in JPG format.')
-    parser.add_argument('--cpu', '-c',          action='store_true',    required=False,     default=False,                           help='Toggles CPU-only mode.')
+    parser.add_argument('--inputpath',  '-i',   action='store',         required=False,     default='/mnt/ml_data/FRA/sourcevideos/Other/16465283-427E-4A87-8329-AE77087BA33A.MP4',    help='Path to the extracted video frames in JPG format.')
+    parser.add_argument('--cpu',        '-c',   action='store_true',    required=False,     default=False,                           help='Toggles CPU-only mode.')
+    parser.add_argument('--force',      '-f',   action='store_true',    required=False,     default=False,                           help='Force object-based trespass detection on.')
 
     args = parser.parse_args()
 
@@ -125,7 +117,7 @@ if __name__ == '__main__':
         device = "cpu"
 
     device_memory = 0
-    device_name = 'CPU'
+    device_name = 'cpu'
     if(device != 'cpu'):
         device_name = torch.cuda.get_device_name(torch.cuda.current_device())
         device_memory = torch.cuda.get_device_properties(device).total_memory
@@ -141,18 +133,6 @@ if __name__ == '__main__':
     print("Torchvision Version: ",torchvision.__version__)
     print("Device in use: ",device, device_name)
     print("Device memory: ", str(size(device_memory, system=si)))
-
-    # detect platform for FFMPEG
-    # if platform.system() == 'Windows':
-    #     # path to ffmpeg bin
-    #     FFMPEG_PATH = 'ffmpeg.exe'
-    #     FFPROBE_PATH = 'ffprobe.exe'
-    # else:
-    #     # path to ffmpeg bin
-    #     default_ffmpeg_path = '/usr/local/bin/ffmpeg'
-    #     default_ffprobe_path = '/usr/local/bin/ffprobe'
-    #     FFMPEG_PATH = default_ffmpeg_path if path.exists(default_ffmpeg_path) else '/usr/bin/ffmpeg'
-    #     FFPROBE_PATH = default_ffprobe_path if path.exists(default_ffprobe_path) else '/usr/bin/ffprobe'
 
     # -------------------------------------------------------------
     # Helper functions
@@ -183,68 +163,32 @@ if __name__ == '__main__':
                         writer.writerow(row)
         csv_file.close()
 
-    # def ffmpeg_getinfo(vid_file_path):
-
-    #     if type(vid_file_path) != str:
-    #         raise Exception('Give ffprobe a full file path of the video')
-    #         return
-
-    #     command = ["ffprobe",
-    #             "-loglevel",  "quiet",
-    #             "-print_format", "json",
-    #              "-show_format",
-    #              "-show_streams",
-    #              vid_file_path
-    #              ]
-
-    # def ffmpeg_process_video(video_file_name, deinterlace=False):
-    #     # FFMPEG commands for video frame extraction
-        
-    #     video_filename, video_file_extension = path.splitext(path.basename(video_file_name))
-    #     video_metadata = ffmpeg_getinfo(video_file_name)
-    #     num_seconds = int(float(video_metadata['streams'][0]['duration']))
-    #     num_of_frames = int(float(video_metadata['streams'][0]['duration_ts']))
-    #     video_width = int(video_metadata['streams'][0]['width'])
-    #     video_height = int(video_metadata['streams'][0]['height'])
-        
-    #     if deinterlace == True:
-    #         deinterlace = 'yadif'
-    #     else:
-    #         deinterlace = ''
-
-    #     ffmpeg_command = [
-    #         FFMPEG_PATH, '-i', video_file_name,
-    #         '-vf', 'fps=' + args.fps, '-r', args.fps, '-vcodec', 'rawvideo', '-pix_fmt', 'rgb24', '-vsync', 'vfr',
-    #         '-hide_banner', '-loglevel', '0', '-vf', ffmpeg_deinterlace, '-f', 'image2pipe', '-vf', 'scale=' + frame_size, '-'
-    #     ]
-
-    #     image_pipe = subprocess.Popen(command, stdout=subprocess.PIPE, bufsize=4*1024*1024)
-
-    # def instance_segmentation_visualize_sort(img, predictions, threshold=0.5, rect_th=1, text_size=1, text_th=1):
-    #     masks, boxes, pred_cls = parse_seg_prediction(predictions, threshold)
-    #     fixed_boxes = fix_box_format(boxes)
-    #     if(fixed_boxes != []):
-    #         sort_boxes = mot_tracker.update(fixed_boxes)
-    #     else:
-    #         sort_boxes = mot_tracker.update(np.empty((0, 5)))
-        
-    #     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    #     for i in range(len(masks)):
-    #         rgb_mask = colour_masks(masks[i])
-    #         img = cv2.addWeighted(img, 1, rgb_mask, 0.5, 0)
-
-    #     for i in range(len(sort_boxes)):
-    #         x = (int(sort_boxes[i][0]), int(sort_boxes[i][1]))
-    #         y = (int(sort_boxes[i][2]), int(sort_boxes[i][3]))
-    #         cv2.rectangle(img,x, y,color=(0, 255, 0), thickness=rect_th)
-    #         cv2.putText(img,'Object #' + str(int(sort_boxes[i][4])), (int(sort_boxes[i][0]), int(sort_boxes[i][1])), cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0), thickness=text_th)
-    #     return img, sort_boxes
-
     def get_sort_id(box_x, sort_boxes):
         for box in sort_boxes:
             if(int(box_x) == int(box[0])):
                 return int(box[4])
+
+
+    def detect_skim_events(model, image_stack):
+        event_detected_th = scene_detection_base_th
+        event_detected = False
+
+        # get the scene predictions
+        scene_preds = run_model(model,image_stack)
+        
+        for pred in scene_preds:
+            scene_max_value, scene_max_index = torch.max(pred,0)
+            max_scene_classification_label = SCENE_LABEL_NAMES[scene_max_index]
+            if(max_scene_classification_label != scene_non_detection_label):
+                event_detected_th -= 1
+                if(event_detected_th < 1):
+                    event_detected = max_scene_classification_label
+                    # print(scene_max_value, scene_max_index, max_scene_classification_label)
+            else:
+                if(event_detected_th < scene_detection_base_th):
+                    event_detected_th += .5
+        
+        return event_detected
 
     # -------------------------------------------------------------
 
@@ -262,13 +206,10 @@ if __name__ == '__main__':
     grade_model.eval()
     grade_model.to(device)
 
-    # load the activity classification model
-    # model_class = torch.load(args.modelfile)
-    # model_class = model_class.to(device)
-    # model_class.eval()
-
-    # load the labels for the classification model
-    # labels = load_labels(args.labelfile)
+    # load the scene classification model
+    model_scene = torch.load('models/fra_scene_v1.pt')
+    model_scene = model_scene.to(device)
+    model_scene.eval()
 
     # setup regular SORT tracking
     sort_trackers = {}
@@ -318,132 +259,159 @@ if __name__ == '__main__':
     grade_segmented = False
     framecount = 0
     extracted_data = []
+    videoskim = True
+    scn_event = False
     
     for chunk in range(video_clips.num_clips()):
-        progress = str(round((chunk / video_clips.num_clips() * 100), 1)) + "% complete"
+        progress = str(round((chunk / video_clips.num_clips() * 100), 1)) + "% complete - " + str(scn_event) + "     "
         sys.stdout.write("Processing: %s   \r" % (progress) )
         sys.stdout.flush()
         video, audio, info, video_idx = video_clips.get_clip(chunk)
         video_output_fps = int(info['video_fps'])
 
-        image_stack = []
+        obj_image_stack = []
+        scn_image_stack = []
         org_image_stack = []
+
         for frame in video:
             org_image = frame.permute(2,0,1)
             org_image = transforms.ToPILImage()(org_image)
-            org_image = transforms.Resize((frame_height,frame_width))(org_image)
-            new_image = transforms.ToTensor()(org_image)
+            new_image = transforms.Resize(new_size)(org_image)
+            new_image = transforms.ToTensor()(new_image)
+            new_image = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(new_image)
             new_image = new_image.numpy()
-            image_stack.append(new_image)
-            org_image_stack.append(org_image)
+            scn_image_stack.append(new_image)
 
-        image_stack = np.asarray(image_stack)
-        image_stack = torch.from_numpy(image_stack)
+        scn_image_stack = np.asarray(scn_image_stack)
+        scn_image_stack = torch.from_numpy(scn_image_stack)
 
         # load batch onto GPU / or register in CPU
-        image_stack = image_stack.to(device)
+        scn_image_stack = scn_image_stack.to(device)
 
-        # get the grade segmentation masks *only on the first batch*
-        if(grade_segmented == False):
-            grade_annotations = run_model(grade_model, image_stack)
-            grade_segmented = True
+        # perform scene detection
+        scn_event = detect_skim_events(model_scene, scn_image_stack)
+        if(scn_event):
+            videoskim = False
+            scn_image_stack = []
 
-            # upload the model since we are done with it
-            # del grade_model
-        
-
-        # get the model predictions / annotations
-        road_annotations = run_model(model_road, image_stack)
-
-        # drop batch out of memory
-        del image_stack
-        if(device != 'cpu'):
-            torch.cuda.empty_cache()
-
-        n = 0
-        for road_annotation in road_annotations:
-
-            # get timestamps for each frame
-            if framecount == 0:
-                video_timestamp = 0
-            else:
-                video_timestamp = framecount / video_output_fps
-
-            video_timestamp = datetime.timedelta(seconds=video_timestamp)
-            video_data = {}
-            video_data["frame_number"] = str(framecount)
-            video_data["frame_timestamp"] = str(video_timestamp)
-
-            # setup our images
-            org_image1 = pil_to_cv(org_image_stack[n])
-
-            # create JSON output
-            is_annotation = False
-            if ([i for i in road_annotation['scores'] if i >= segmentation_threshold]):
-                road_masks, road_boxes, road_labels, road_scores = parse_seg_prediction(road_annotation, segmentation_threshold, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES)
-                is_annotation = True
-
-            road_img = org_image1
-
-            # fix the colors..
-            # road_img = cv2.cvtColor(road_img, cv2.COLOR_BGR2RGB)
+        if(videoskim == False):
+            # create a batch for the object detection model to process
+            for frame in video:
+                org_image = frame.permute(2,0,1)
+                org_image = transforms.ToPILImage()(org_image)
+                org_image = transforms.Resize((frame_height,frame_width))(org_image)
+                new_image = transforms.ToTensor()(org_image)
+                new_image = new_image.numpy()
+                obj_image_stack.append(new_image)
+                org_image_stack.append(org_image)
             
-            boxes_by_label = {}
-            if is_annotation == True:
-                for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
-                    collected_boxes = []
-                    collected_masks = []
-                    collected_labels = []
-                    collected_scores = []
-                    idx = 0
-                    for road_label in road_labels:
-                        if(label == road_label):
-                            collected_boxes.append(road_boxes[idx])
-                            collected_masks.append(road_masks[idx])
-                            collected_labels.append(road_labels[idx])
-                            collected_scores.append(road_scores[idx])
-                        idx += 1
-                    road_img, grade_masks, grade_cls = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
-                    sort_boxes = update_sort(road_img, collected_boxes, collected_scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname=label)
-                    event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  grade_cls, sort_boxes, event_trackers, video_data["frame_timestamp"], label)
-                    # output all events in current frame
-                    # for evt in event_detections:
-                    #     if evt != False and label != "train":
-                    #         row = []
-                    #         row.append(video_data["frame_number"])
-                    #         row.append(video_data["frame_timestamp"])
-                    #         row.append(label)
-                    #         row.append(evt)
-                    #         event_writer.writerow(row)
-                    road_img = instance_segmentation_visualize_sort(road_img, collected_masks, sort_boxes, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
-                    new_line = [collected_boxes]
-                    boxes_by_label[label] = new_line
+            obj_image_stack = np.asarray(obj_image_stack)
+            obj_image_stack = torch.from_numpy(obj_image_stack)
+
+            # load batch onto GPU / or register in CPU
+            obj_image_stack = obj_image_stack.to(device)
             
-            # save the video to disk
-            video_out.write(road_img)
+            # get the grade segmentation masks *only on the first batch*
+            if(grade_segmented == False):
+                grade_annotations = run_model(grade_model, obj_image_stack)
+                grade_segmented = True
 
-            # write out the JSON
-            combined_output = {}
-            combined_output.update({"video":video_data})
-            combined_output.update({"tracking":boxes_by_label})
-            # combined_output.update({'roadway':road_output})
-            # End our JSON line with a comma, unless this is the last one
-            lineEnd = ',\n'
-            if (n == len(road_annotations)-1 and chunk == video_clips.num_clips() - 1):
-                lineEnd = '\n'
-            # Replace characters in str output to make this valid JSON
-            outputline = (str(combined_output) + lineEnd).replace("'", '"')
-            outputline = outputline.replace("(", "\"(")
-            outputline = outputline.replace(")", ")\"")
-            dataoutput.write(outputline)
-            dataoutput.flush()
+                # upload the model since we are done with it
+                del grade_model
 
-            framecount += 1
-            n += 1
-        
-        # clean up memory
-        del road_img
-        del road_annotations
+            # get the model predictions / annotations
+            road_annotations = run_model(model_road, obj_image_stack)
+
+            # drop batch out of memory
+            del obj_image_stack
+            del scn_image_stack
+            if(device != 'cpu'):
+                torch.cuda.empty_cache()
+
+            n = 0
+            for road_annotation in road_annotations:
+
+                # get timestamps for each frame
+                if framecount == 0:
+                    video_timestamp = 0
+                else:
+                    video_timestamp = framecount / video_output_fps
+
+                video_timestamp = datetime.timedelta(seconds=video_timestamp)
+                video_data = {}
+                video_data["frame_number"] = str(framecount)
+                video_data["frame_timestamp"] = str(video_timestamp)
+
+                # setup our images
+                org_image1 = pil_to_cv(org_image_stack[n])
+
+                # create JSON output
+                is_annotation = False
+                if ([i for i in road_annotation['scores'] if i >= segmentation_threshold]):
+                    road_masks, road_boxes, road_labels, road_scores = parse_seg_prediction(road_annotation, segmentation_threshold, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES)
+                    is_annotation = True
+
+                road_img = org_image1
+
+                # fix the colors..
+                # road_img = cv2.cvtColor(road_img, cv2.COLOR_BGR2RGB)
+                
+                boxes_by_label = {}
+                if is_annotation == True:
+                    for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
+                        collected_boxes = []
+                        collected_masks = []
+                        collected_labels = []
+                        collected_scores = []
+                        idx = 0
+                        for road_label in road_labels:
+                            if(label == road_label):
+                                collected_boxes.append(road_boxes[idx])
+                                collected_masks.append(road_masks[idx])
+                                collected_labels.append(road_labels[idx])
+                                collected_scores.append(road_scores[idx])
+                            idx += 1
+                        road_img, grade_masks, grade_cls = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
+                        sort_boxes = update_sort(road_img, collected_boxes, collected_scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname=label)
+                        event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  grade_cls, sort_boxes, event_trackers, video_data["frame_timestamp"], label)
+                        # output all events in current frame
+                        # for evt in event_detections:
+                        #     if evt != False and label != "train":
+                        #         row = []
+                        #         row.append(video_data["frame_number"])
+                        #         row.append(video_data["frame_timestamp"])
+                        #         row.append(label)
+                        #         row.append(evt)
+                        #         event_writer.writerow(row)
+                        road_img = instance_segmentation_visualize_sort(road_img, collected_masks, sort_boxes, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
+                        new_line = [collected_boxes]
+                        boxes_by_label[label] = new_line
+                
+                # save the video to disk
+                video_out.write(road_img)
+
+                # write out the JSON
+                combined_output = {}
+                combined_output.update({"video":video_data})
+                combined_output.update({"tracking":boxes_by_label})
+                # combined_output.update({'roadway':road_output})
+                # End our JSON line with a comma, unless this is the last one
+                lineEnd = ',\n'
+                if (n == len(road_annotations)-1 and chunk == video_clips.num_clips() - 1):
+                    lineEnd = '\n'
+                # Replace characters in str output to make this valid JSON
+                outputline = (str(combined_output) + lineEnd).replace("'", '"')
+                outputline = outputline.replace("(", "\"(")
+                outputline = outputline.replace(")", ")\"")
+                dataoutput.write(outputline)
+                dataoutput.flush()
+
+                framecount += 1
+                n += 1
+            
+            # clean up memory
+            del road_img
+            del road_annotations
 
     dataoutput.write('\n]')
     dataoutput.flush()
