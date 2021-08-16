@@ -58,7 +58,7 @@ scene_detection_base_th = 3                 # 10 frames before an event is detec
 scene_non_detection_label = 'notrain'       # label indicates no event detected
 
 # grade / right-of-way segmentation model settings
-grade_num_classes = 3
+grade_num_classes = 2
 GRADE_CATEGORY_NAMES = [
     '__background__', 'GradeCrossing', 'RightOfWay'
 ]
@@ -117,7 +117,6 @@ if __name__ == '__main__':
         device = "cpu"
 
     device_memory = 0
-    device_name = 'cpu'
     if(device != 'cpu'):
         device_name = torch.cuda.get_device_name(torch.cuda.current_device())
         device_memory = torch.cuda.get_device_properties(device).total_memory
@@ -131,7 +130,7 @@ if __name__ == '__main__':
     # Debug data
     print("PyTorch Version: ",torch.__version__)
     print("Torchvision Version: ",torchvision.__version__)
-    print("Device in use: ",device, device_name)
+    print("Device in use: ",device)
     print("Device memory: ", str(size(device_memory, system=si)))
 
     # -------------------------------------------------------------
@@ -207,7 +206,10 @@ if __name__ == '__main__':
     grade_model.to(device)
 
     # load the scene classification model
-    model_scene = torch.load('models/fra_scene_v1.pt')
+    if(device != 'cpu'):
+        model_scene = torch.load('models/fra_scene_v1.pt')
+    else: 
+        model_scene = torch.load('models/fra_scene_v1.pt', map_location=torch.device('cpu'))
     model_scene = model_scene.to(device)
     model_scene.eval()
 
@@ -240,7 +242,7 @@ if __name__ == '__main__':
 
     event_output = open(Path(args.outputpath) / Path(str(input_filename + '-events.csv')), 'w')
     event_writer = csv.writer(event_output)
-    header = ["label", "object_id", "event_type", "start_timestamp", "end_timestamp"]
+    header = ["Object ID", "label", "event_type", "Start Time", "End Time", "Train Present?", "TAT"]
     event_writer.writerow(header)
 
     output_filename = str(Path(args.outputpath) / Path(str(input_filename) + '-processed.mp4'))
@@ -341,6 +343,7 @@ if __name__ == '__main__':
                 video_data = {}
                 video_data["frame_number"] = str(framecount)
                 video_data["frame_timestamp"] = str(video_timestamp)
+                video_data["frame_timestamp_raw"] = video_timestamp
 
                 # setup our images
                 org_image1 = pil_to_cv(org_image_stack[n])
@@ -373,7 +376,7 @@ if __name__ == '__main__':
                             idx += 1
                         road_img, grade_masks, grade_cls = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
                         sort_boxes = update_sort(road_img, collected_boxes, collected_scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname=label)
-                        event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  grade_cls, sort_boxes, event_trackers, video_data["frame_timestamp"], label)
+                        event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  grade_cls, sort_boxes, event_trackers, video_data["frame_timestamp_raw"], label)
                         # output all events in current frame
                         # for evt in event_detections:
                         #     if evt != False and label != "train":
@@ -391,6 +394,8 @@ if __name__ == '__main__':
                 video_out.write(road_img)
 
                 # write out the JSON
+                # We no longer need the raw timestamp here
+                del video_data["frame_timestamp_raw"]
                 combined_output = {}
                 combined_output.update({"video":video_data})
                 combined_output.update({"tracking":boxes_by_label})
@@ -417,16 +422,42 @@ if __name__ == '__main__':
     dataoutput.flush()
     dataoutput.close()
 
+    # Output Events
+    # Find any trains
+    # these are not events, but we will report if a train is present for a given event
+    train_events = event_trackers['train']
+
+    def is_train_present(event):
+        for tevt in train_events:
+            # Event starts during train event
+            if event["start_time"] <= tevt["stop_time"] and event["start_time"] >= tevt["start_time"]:
+                return tevt
+            # Event ends during train event
+            if event["stop_time"] <= tevt["stop_time"] and event["stop_time"] >= tevt["start_time"]:
+                return tevt
+            # Train event is contained within event
+            if tevt["start_time"] >= event["start_time"] and tevt["stop_time"] <= event["stop_time"]:
+                return tevt
+        return None
+
     for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
-        for event in event_trackers[label]:
-            ["label", "object_id", "event_type", "start_timestamp", "end_timestamp"]
-            row = []
-            row.append(event["label"])
-            row.append(event["id"])
-            row.append(event["evt_type"])
-            row.append(event["start_time"])
-            row.append(event["stop_time"])
-            event_writer.writerow(row)
+        if label != 'train':
+            for event in event_trackers[label]:
+                ["label", "object_id", "event_type", "start_timestamp", "end_timestamp"]
+                row = []
+                row.append(event["id"])
+                row.append(event["label"])
+                row.append(event["evt_type"])
+                row.append(str(event["start_time"]))
+                row.append(str(event["stop_time"]))
+                train_event = is_train_present(event)
+                if (train_event is not None):
+                    row.append("Yes")
+                    row.append(train_event["start_time"])
+                else:
+                    row.append("No")
+                    row.append("")
+                event_writer.writerow(row)
     event_output.close()
     video_out.release() 
     create_csv_from_json()
