@@ -55,14 +55,14 @@ force_video_height = 480
 
 # scene model detection thresholds
 scene_detection_base_th = 3                 # 10 frames before an event is detected
-scene_non_detection_label = 'notrain'       # label indicates no event detected
+scene_non_detection_label = 'noactivation'  # label indicates no event detected
 
 # grade / right-of-way segmentation model settings
 grade_num_classes = 2
 GRADE_CATEGORY_NAMES = [
     '__background__', 'GradeCrossing', 'RightOfWay'
 ]
-SCENE_LABEL_NAMES = ["activation","notrain","train"]
+SCENE_LABEL_NAMES = ["activation","noactivation"]
 GRADE_LABEL_COLORS = [[0, 0, 255],[0, 255, 0],[255, 0, 0],[0, 255, 255],[255, 255, 0],[255, 0, 255],[80, 70, 180]]
 
 # Roadway features model settings
@@ -207,15 +207,18 @@ if __name__ == '__main__':
 
     # load the scene classification model
     if(device != 'cpu'):
-        model_scene = torch.load('models/fra_scene_v1.pt')
+        model_scene = torch.load('models/saved_model_squeezenet.pt')
     else: 
-        model_scene = torch.load('models/fra_scene_v1.pt', map_location=torch.device('cpu'))
+        model_scene = torch.load('models/saved_model_squeezenet.pt', map_location=torch.device('cpu'))
     model_scene = model_scene.to(device)
     model_scene.eval()
 
     # setup regular SORT tracking
     sort_trackers = {}
     event_trackers = {}
+    activationGroups = []
+    activated = False
+    currentAct = {}
     for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
         sort_trackers[label] = Sort(max_age=sort_max_age, min_hits=sort_min_hits, iou_threshold=sort_ios_threshold)
         event_trackers[label] = []
@@ -242,7 +245,7 @@ if __name__ == '__main__':
 
     event_output = open(Path(args.outputpath) / Path(str(input_filename + '-events.csv')), 'w')
     event_writer = csv.writer(event_output)
-    header = ["Object ID", "label", "event_type", "Start Time", "End Time", "Train Present?", "TAT"]
+    header = ["Object ID", "label", "event_type", "Start Time", "End Time", "Gate Descent Start", "Gate Ascent End", "Train Present?", "TAT"]
     event_writer.writerow(header)
 
     output_filename = str(Path(args.outputpath) / Path(str(input_filename) + '-processed.mp4'))
@@ -331,15 +334,24 @@ if __name__ == '__main__':
                 torch.cuda.empty_cache()
 
             n = 0
+
+            # get timestamps for each frame
+            if framecount == 0:
+                video_timestamp = 0
+            else:
+                video_timestamp = framecount / video_output_fps
+            video_timestamp = datetime.timedelta(seconds=video_timestamp)
+            if not activated and scn_event == 'activation':
+                currentAct['start'] = video_timestamp
+                activated = True
+            if scn_event =="noactivation" and activated:
+                currentAct['end'] = video_timestamp
+                activationGroups.append(currentAct)
+                currentAct = {}
+                activated = False
+
             for road_annotation in road_annotations:
 
-                # get timestamps for each frame
-                if framecount == 0:
-                    video_timestamp = 0
-                else:
-                    video_timestamp = framecount / video_output_fps
-
-                video_timestamp = datetime.timedelta(seconds=video_timestamp)
                 video_data = {}
                 video_data["frame_number"] = str(framecount)
                 video_data["frame_timestamp"] = str(video_timestamp)
@@ -413,14 +425,19 @@ if __name__ == '__main__':
 
                 framecount += 1
                 n += 1
-            
             # clean up memory
             del road_img
             del road_annotations
 
+    # If the gate is still 'activated' at the end of the video, close out the activation
+    if activated:
+        currentAct['end'] = video_timestamp
+        activationGroups.append(currentAct)
     dataoutput.write('\n]')
     dataoutput.flush()
     dataoutput.close()
+
+    
 
     # Output Events
     # Find any trains
@@ -440,16 +457,38 @@ if __name__ == '__main__':
                 return tevt
         return None
 
+    def is_during_activation(event):
+        for act in activationGroups:
+            # Event starts during train event
+            if event["start_time"] <= act["end"] and event["start_time"] >= act["start"]:
+                return act
+            # Event ends during train event
+            if event["stop_time"] <= act["end"] and event["stop_time"] >= act["start"]:
+                return act
+            # Train event is contained within event
+            if act["start"] >= event["start_time"] and act["end"] <= event["stop_time"]:
+                return act
+        return None
+
     for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
         if label != 'train':
             for event in event_trackers[label]:
-                ["label", "object_id", "event_type", "start_timestamp", "end_timestamp"]
+                activation_start, activation_end = '', ''
+                if event["evt_type"] == 'GradeCrossing':
+                    activ = is_during_activation(event)
+                    if not activ:
+                        continue
+                    else:
+                        activation_start = str(activ["start"])
+                        activation_end = str(activ["end"])
                 row = []
                 row.append(event["id"])
                 row.append(event["label"])
                 row.append(event["evt_type"])
                 row.append(str(event["start_time"]))
                 row.append(str(event["stop_time"]))
+                row.append(activation_start)
+                row.append(activation_end)
                 train_event = is_train_present(event)
                 if (train_event is not None):
                     row.append("Yes")
@@ -463,6 +502,7 @@ if __name__ == '__main__':
     create_csv_from_json()
     # Wrap up (might want to remove this once integrated into Electron)
     print(' ')
+    print(activationGroups)
     stop = timeit.default_timer()
     total_time = stop - start
     mins, secs = divmod(total_time, 60)
