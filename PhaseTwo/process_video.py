@@ -7,7 +7,7 @@ import csv
 import os
 import sys
 
-## 'Unused' imports, required to make pyinstaller included them during compilation
+## 'Unused' imports, required to make pyinstaller include them during compilation
 import scipy
 import av
 from scipy.stats import statlib
@@ -171,7 +171,8 @@ if __name__ == '__main__':
     def detect_skim_events(model, image_stack):
         event_detected_th = scene_detection_base_th
         event_detected = False
-
+        bframe = 0
+        start_frame = 0
         # get the scene predictions
         scene_preds = run_model(model,image_stack)
         
@@ -182,12 +183,14 @@ if __name__ == '__main__':
                 event_detected_th -= 1
                 if(event_detected_th < 1):
                     event_detected = max_scene_classification_label
+                    if start_frame <= bframe:
+                        start_frame = bframe
                     # print(scene_max_value, scene_max_index, max_scene_classification_label)
             else:
                 if(event_detected_th < scene_detection_base_th):
                     event_detected_th += .5
-        
-        return event_detected
+            bframe += 1
+        return event_detected, start_frame, bframe + 1
 
     # -------------------------------------------------------------
 
@@ -294,11 +297,30 @@ if __name__ == '__main__':
         scn_image_stack = scn_image_stack.to(device)
 
         # perform scene detection
-        scn_event = detect_skim_events(model_scene, scn_image_stack)
+        scn_event, ev_start_frame, total_batch_frames = detect_skim_events(model_scene, scn_image_stack)
         if(scn_event):
             videoskim = False
             scn_image_stack = []
-
+            # If we are not already in an activation, register the start timestamp
+            if not activated:
+                activated = True
+                if framecount == 0 and ev_start_frame == 0:
+                    ev_start_timestamp = 0
+                else:
+                    ev_start_timestamp = (framecount + ev_start_frame) / video_output_fps
+                ev_start_timestamp = datetime.timedelta(seconds=ev_start_timestamp)
+                currentAct['start'] = ev_start_timestamp
+        # If we were in an activation and it has ended, update the activation accordingly
+        else:
+            if activated:
+                # Use the last frame of the last batch as our endpoint
+                # This should be close to the 'true' end, but could cause overlap if many consective frames are needed for an activation
+                ev_end_timestamp = framecount / video_output_fps
+                ev_end_timestamp = datetime.timedelta(seconds=ev_end_timestamp)
+                currentAct['end'] = ev_end_timestamp
+                activationGroups.append(currentAct)
+                currentAct = {}
+                activated = False
         if(videoskim == False):
             # create a batch for the object detection model to process
             for frame in video:
@@ -341,14 +363,6 @@ if __name__ == '__main__':
             else:
                 video_timestamp = framecount / video_output_fps
             video_timestamp = datetime.timedelta(seconds=video_timestamp)
-            if not activated and scn_event == 'activation':
-                currentAct['start'] = video_timestamp
-                activated = True
-            if scn_event =="noactivation" and activated:
-                currentAct['end'] = video_timestamp
-                activationGroups.append(currentAct)
-                currentAct = {}
-                activated = False
 
             for road_annotation in road_annotations:
 
@@ -389,15 +403,6 @@ if __name__ == '__main__':
                         road_img, grade_masks, grade_cls = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
                         sort_boxes = update_sort(road_img, collected_boxes, collected_scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname=label)
                         event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  grade_cls, sort_boxes, event_trackers, video_data["frame_timestamp_raw"], label)
-                        # output all events in current frame
-                        # for evt in event_detections:
-                        #     if evt != False and label != "train":
-                        #         row = []
-                        #         row.append(video_data["frame_number"])
-                        #         row.append(video_data["frame_timestamp"])
-                        #         row.append(label)
-                        #         row.append(evt)
-                        #         event_writer.writerow(row)
                         road_img = instance_segmentation_visualize_sort(road_img, collected_masks, sort_boxes, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
                         new_line = [collected_boxes]
                         boxes_by_label[label] = new_line
@@ -447,13 +452,13 @@ if __name__ == '__main__':
     def is_train_present(event):
         for tevt in train_events:
             # Event starts during train event
-            if event["start_time"] <= tevt["stop_time"] and event["start_time"] >= tevt["start_time"]:
+            if event["start"] <= tevt["stop_time"] and event["start"] >= tevt["start_time"]:
                 return tevt
             # Event ends during train event
-            if event["stop_time"] <= tevt["stop_time"] and event["stop_time"] >= tevt["start_time"]:
+            if event["end"] <= tevt["stop_time"] and event["end"] >= tevt["start_time"]:
                 return tevt
             # Train event is contained within event
-            if tevt["start_time"] >= event["start_time"] and tevt["stop_time"] <= event["stop_time"]:
+            if tevt["start_time"] >= event["start"] and tevt["stop_time"] <= event["end"]:
                 return tevt
         return None
 
@@ -489,7 +494,7 @@ if __name__ == '__main__':
                 row.append(str(event["stop_time"]))
                 row.append(activation_start)
                 row.append(activation_end)
-                train_event = is_train_present(event)
+                train_event = is_train_present(activ)
                 if (train_event is not None):
                     row.append("Yes")
                     row.append(train_event["start_time"])
@@ -501,8 +506,6 @@ if __name__ == '__main__':
     video_out.release() 
     create_csv_from_json()
     # Wrap up (might want to remove this once integrated into Electron)
-    print(' ')
-    print(activationGroups)
     stop = timeit.default_timer()
     total_time = stop - start
     mins, secs = divmod(total_time, 60)
