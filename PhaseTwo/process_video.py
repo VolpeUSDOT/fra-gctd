@@ -57,6 +57,10 @@ force_video_height = 480
 scene_detection_base_th = 3                 # 10 frames before an event is detected
 scene_non_detection_label = 'noactivation'  # label indicates no event detected
 
+# Minimum length for a grade crossing activation
+# Activations shorter than this will be removed as false positives
+activation_min_len_seconds = 5
+
 # grade / right-of-way segmentation model settings
 grade_num_classes = 2
 GRADE_CATEGORY_NAMES = [
@@ -441,6 +445,13 @@ if __name__ == '__main__':
     dataoutput.write('\n]')
     dataoutput.flush()
     dataoutput.close()
+
+    # Clean activation events by removing those shorter than our threshold
+    # False positives tend to be very short
+    for activ in activationGroups:
+        delta = activ["end"] - activ["start"]
+        if (delta.seconds < activation_min_len_seconds):
+            activationGroups.remove(activ)
 
     
 
