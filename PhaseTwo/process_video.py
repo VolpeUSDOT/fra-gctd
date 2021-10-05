@@ -358,18 +358,16 @@ if __name__ == '__main__':
             del scn_image_stack
             if(device != 'cpu'):
                 torch.cuda.empty_cache()
-
             n = 0
-
-            # get timestamps for each frame
-            if framecount == 0:
-                video_timestamp = 0
-            else:
-                video_timestamp = framecount / video_output_fps
-            video_timestamp = datetime.timedelta(seconds=video_timestamp)
-
+            
             for road_annotation in road_annotations:
-
+                # get timestamps for each frame
+                if framecount == 0:
+                    video_timestamp = 0
+                else:
+                    video_timestamp = framecount / video_output_fps
+                video_timestamp = datetime.timedelta(seconds=video_timestamp)
+                
                 video_data = {}
                 video_data["frame_number"] = str(framecount)
                 video_data["frame_timestamp"] = str(video_timestamp)
