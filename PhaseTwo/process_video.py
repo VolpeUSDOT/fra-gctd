@@ -62,7 +62,7 @@ scene_non_detection_label = 'noactivation'  # label indicates no event detected
 activation_min_len_seconds = 5
 
 # grade / right-of-way segmentation model settings
-grade_num_classes = 2
+grade_num_classes = 3
 GRADE_CATEGORY_NAMES = [
     '__background__', 'GradeCrossing', 'RightOfWay'
 ]
@@ -471,46 +471,54 @@ if __name__ == '__main__':
                 return tevt
         return None
 
-    def is_during_activation(event):
-        for act in activationGroups:
-            # Event starts during train event
-            if event["start_time"] <= act["end"] and event["start_time"] >= act["start"]:
-                return act
-            # Event ends during train event
-            if event["stop_time"] <= act["end"] and event["stop_time"] >= act["start"]:
-                return act
-            # Train event is contained within event
-            if act["start"] >= event["start_time"] and act["end"] <= event["stop_time"]:
-                return act
-        return None
+    def is_during_activation(act, event):
+        # Event starts during train event
+        if event["start_time"] <= act["end"] and event["start_time"] >= act["start"]:
+            return True
+        # Event ends during train event
+        if event["stop_time"] <= act["end"] and event["stop_time"] >= act["start"]:
+            return True
+        # Train event is contained within event
+        if act["start"] >= event["start_time"] and act["end"] <= event["stop_time"]:
+            return True
+        return False
+    
+    def create_event_row(id, label, type, start, stop, act_start, act_end, train_event):
+        row = []
+        row.append(id)
+        row.append(label)
+        row.append(type)
+        row.append(start)
+        row.append(stop)
+        row.append(act_start)
+        row.append(act_end)
+        if (train_event is not None):
+            row.append("Yes")
+            row.append(train_event["start_time"])
+        else:
+            row.append("No")
+            row.append("")
+        return row
 
-    for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
-        if label != 'train':
-            for event in event_trackers[label]:
-                activation_start, activation_end = '', ''
-                if event["evt_type"] == 'GradeCrossing':
-                    activ = is_during_activation(event)
-                    if not activ:
+    for act in activationGroups:
+        activationIncluded = False
+        train_event = is_train_present(act)
+        # For each label, check all events for overlap
+        for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
+            if label != 'train':
+                for event in event_trackers[label]:
+                    if not is_during_activation(act, event):
                         continue
-                    else:
-                        activation_start = str(activ["start"])
-                        activation_end = str(activ["end"])
-                row = []
-                row.append(event["id"])
-                row.append(event["label"])
-                row.append(event["evt_type"])
-                row.append(str(event["start_time"]))
-                row.append(str(event["stop_time"]))
-                row.append(activation_start)
-                row.append(activation_end)
-                train_event = is_train_present(activ)
-                if (train_event is not None):
-                    row.append("Yes")
-                    row.append(train_event["start_time"])
-                else:
-                    row.append("No")
-                    row.append("")
-                event_writer.writerow(row)
+                    row = create_event_row(event["id"], event["label"], event["evt_type"], str(event["start_time"]),
+                                        str(event["stop_time"]), str(act["start"]), str(act["end"]), train_event)
+                    event_writer.writerow(row)
+                    activationIncluded = True
+        if not activationIncluded:
+            row = create_event_row("N/A", "N/A", "N/A", "N/A", "N/A", 
+                                    str(act["start"]), str(activ["end"]), train_event)
+            event_writer.writerow(row)
+
+
     event_output.close()
     video_out.release() 
     create_csv_from_json()
