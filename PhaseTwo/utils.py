@@ -204,7 +204,6 @@ def instance_segmentation_visualize_sort(img, masks, sort_boxes, boxes, pred_cls
                                         threshold=0.5, rect_th=2, text_size=.50, text_th=2, classname='Object'):
 
         label_color_idx = labels.index(classname)
-
         for i in range(len(masks)):
             if(masks[i].ndim > 1):
                 violation_detection = event_detections[i]

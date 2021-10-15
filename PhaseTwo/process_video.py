@@ -97,7 +97,7 @@ DEEPSORT_CONFIG = DEEPSORT_CONFIG_CLASS()
 
 if __name__ == '__main__':
 
-    # Necessary to run compiled on Windows
+    # Necessary to run compiled on Windows - uncomment before running pyinstaller
     #multiprocessing.freeze_support()
 
     # Deal with command line arguments.
@@ -405,7 +405,7 @@ if __name__ == '__main__':
                         road_img, grade_masks, grade_cls = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
                         sort_boxes = update_sort(road_img, collected_boxes, collected_scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname=label)
                         event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  grade_cls, sort_boxes, event_trackers, video_data["frame_timestamp_raw"], label)
-                        road_img = instance_segmentation_visualize_sort(road_img, collected_masks, sort_boxes, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES ,segmentation_threshold, classname=label)
+                        road_img = instance_segmentation_visualize_sort(road_img, collected_masks, sort_boxes, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES, activated, classname=label)
                         new_line = [collected_boxes]
                         boxes_by_label[label] = new_line
                 
@@ -458,16 +458,16 @@ if __name__ == '__main__':
     # these are not events, but we will report if a train is present for a given event
     train_events = event_trackers['train']
 
-    def is_train_present(event):
+    def is_train_present(evt_start, evt_end):
         for tevt in train_events:
             # Event starts during train event
-            if event["start"] <= tevt["stop_time"] and event["start"] >= tevt["start_time"]:
+            if evt_start <= tevt["stop_time"] and evt_start >= tevt["start_time"]:
                 return tevt
             # Event ends during train event
-            if event["end"] <= tevt["stop_time"] and event["end"] >= tevt["start_time"]:
+            if evt_end <= tevt["stop_time"] and evt_end >= tevt["start_time"]:
                 return tevt
             # Train event is contained within event
-            if tevt["start_time"] >= event["start"] and tevt["stop_time"] <= event["end"]:
+            if tevt["start_time"] >= evt_start and tevt["stop_time"] <= evt_end:
                 return tevt
         return None
 
@@ -499,14 +499,21 @@ if __name__ == '__main__':
             row.append("No")
             row.append("")
         return row
+    
+    # Row events will be handled separately
+    rowEvents = []
 
     for act in activationGroups:
         activationIncluded = False
-        train_event = is_train_present(act)
+        train_event = is_train_present(act["start"], act["end"])
         # For each label, check all events for overlap
         for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
             if label != 'train':
                 for event in event_trackers[label]:
+                    if event["evt_type"] == "RightOfWay":
+                        rowEvents.append(event)
+                        event_trackers[label].remove(event)
+                        continue
                     if not is_during_activation(act, event):
                         continue
                     row = create_event_row(event["id"], event["label"], event["evt_type"], str(event["start_time"]),
@@ -517,6 +524,11 @@ if __name__ == '__main__':
             row = create_event_row("N/A", "N/A", "N/A", "N/A", "N/A", 
                                     str(act["start"]), str(activ["end"]), train_event)
             event_writer.writerow(row)
+
+    for event in rowEvents:
+        row = create_event_row(event["id"], event["label"], event["evt_type"], str(event["start_time"]),
+                                        str(event["stop_time"]), 'N/A', 'N/A', is_train_present(event["start_time"], event["stop_time"]))
+        event_writer.writerow(row)
 
 
     event_output.close()
