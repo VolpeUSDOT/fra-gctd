@@ -43,14 +43,19 @@ function startProcess(video) {
     var outputPath = path.join(global.settings.get("outputDir"), fileName);
     console.log("OutputPath", outputPath);
 
+    var cpuMode = global.settings.get("cpuMode");
+
     if (!fs.existsSync(outputPath)){
         fs.mkdirSync(outputPath);
     }
     var logfile = path.join(outputPath, "process-log.txt");
     let writeStream = fs.createWriteStream(logfile);
-    
+
+    var execArgs = ['--inputpath', video.path, '--outputpath', outputPath];
+    if (cpuMode !== "gpu")
+        execArgs.push("--cpu");
     var child = execFile("process_video.exe", 
-                        ['--inputpath', video.path, '--outputpath', outputPath, '--cpu'], 
+                        execArgs, 
                         {cwd : processDir});
 
     child.stdout.on('data', function(data) {

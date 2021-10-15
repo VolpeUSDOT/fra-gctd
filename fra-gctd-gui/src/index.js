@@ -22,7 +22,11 @@ const createWindow = () => {
   mainWindow.maximize();
   // and load the index.html of the app.
   mainWindow.loadFile(path.join(__dirname, 'index.html'), 
-                      {query: {"outputDir": global.settings.get("outputDir")}});
+                      {query: {
+                        "outputDir": global.settings.get("outputDir"),
+                        "cpuMode": global.settings.get("cpuMode")
+                      }});
+  mainWindow.webContents.openDevTools();
   Menu.setApplicationMenu(null);
 };
 
@@ -48,7 +52,7 @@ app.on('activate', () => {
   }
 });
 
-ipcMain.on('open-output-browser', function(event) {
+ipcMain.on('open-output-browser', (event) => {
     return dialog.showOpenDialog({
       properties: ['openDirectory']
   }).then(files => {
@@ -60,6 +64,12 @@ ipcMain.on('open-output-browser', function(event) {
           event.reply("output-dir-updated", {outputPath: outputDir});
       }
   });
+});
+
+ipcMain.on('update-cpu-mode', (event, mode) => {
+  if (mode !== undefined) {
+    global.settings.set("cpuMode", mode);
+  }
 });
 
 // In this file you can include the rest of your app's specific main process

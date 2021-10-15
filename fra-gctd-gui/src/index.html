@@ -18,9 +18,25 @@
         <p>To start, drop or browse to a video file, or a directory containing video files you want to analyze</p>
         <br />
         <br />
-        <h4>Select your output directory:</h4>
-        <input style="width: 50%" id ="outputDir" disabled="true" type="text" value="" />
-        <button id="outputBrowseBtn">Browse</button>
+        <div>
+          <div>
+            <h4>Select your output directory:</h4>
+            <input style="width: 50%" id ="outputDir" disabled="true" type="text" value="" />
+            <button id="outputBrowseBtn">Browse</button>
+          </div>
+          <br />
+          <div>
+            <input type="radio" id="cpu" name="cpuMode" value="cpu">
+            <label for="cpu">CPU Only</label><br>
+            <input type="radio" id="gpu" name="cpuMode" value="gpu">
+            <label for="gpu">Use GPU (Requires NVIDIA GPU and installation of NVIDIA CUDA)</label><br>
+          </div>
+          <br />
+          <!--<div>
+            <input type="checkbox" id="skim">
+            <label for="skim">Skim Videos for Activations</label>
+          </div>-->
+        </div>
       </div>
       <div id="videoList" class="videoList" style="display: none;">
         <table class="table table-striped" id="videoTable">

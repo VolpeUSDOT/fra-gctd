@@ -5,13 +5,19 @@ const path = require("path");
 class SettingsManager {
     constructor(opts) {
         const dataDir = app.getPath('appData');
-        this.path = path.join(dataDir, "settings.json");
+        var directory = path.join(dataDir, "fragctd");
+        if (!fs.existsSync(directory)){
+            fs.mkdirSync(directory);
+        }
+        this.path = path.join(directory, "settings.json");
         try {
             this.data = JSON.parse(fs.readFileSync(this.path));
         } catch(error) {
             // Set to defaults
             this.data = {
                 "outputDir": path.join(app.getPath("documents"), "gctdOutput"),
+                "cpuMode": "cpu",
+                "skimMode": true
             };
         }
     }

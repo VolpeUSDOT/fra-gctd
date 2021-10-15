@@ -8,6 +8,10 @@ window.selectOutputDir = () => {
     return ipcRenderer.send('open-output-browser', null);
 };
 
+window.setCpuMode = (mode) => {
+    return ipcRenderer.send('update-cpu-mode', mode);
+};
+
 window.sendFilePaths = (paths) => {
     arg = {};
     arg.paths = paths;
