@@ -503,13 +503,23 @@ if __name__ == '__main__':
     # Row events will be handled separately
     rowEvents = []
 
-    for act in activationGroups:
-        activationIncluded = False
-        train_event = is_train_present(act["start"], act["end"])
-        # For each label, check all events for overlap
+    # If we have no activations, we still want to capture the ROW events
+    if (len(activationGroups) == 0):
         for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
             if label != 'train':
                 for event in event_trackers[label]:
+                    if event["evt_type"] == "RightOfWay":
+                        rowEvents.append(event)
+
+    # Output events for each activation
+    for act in activationGroups:
+        activationIncluded = False
+        train_event = is_train_present(act["start"], act["end"])
+        # For each label, check all events for overlap with current activation
+        for label in COCO_INSTANCE_VISIBLE_CATEGORY_NAMES:
+            if label != 'train':
+                for event in event_trackers[label]:
+                    # ROW events should be handled separately
                     if event["evt_type"] == "RightOfWay":
                         rowEvents.append(event)
                         event_trackers[label].remove(event)
