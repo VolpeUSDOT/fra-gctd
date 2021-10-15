@@ -44,6 +44,7 @@ function startProcess(video) {
     console.log("OutputPath", outputPath);
 
     var cpuMode = global.settings.get("cpuMode");
+    var skim = global.settings.get("skimMode");
 
     if (!fs.existsSync(outputPath)){
         fs.mkdirSync(outputPath);
@@ -54,6 +55,9 @@ function startProcess(video) {
     var execArgs = ['--inputpath', video.path, '--outputpath', outputPath];
     if (cpuMode !== "gpu")
         execArgs.push("--cpu");
+    if (skim)
+        execArgs.push("--skim");
+    console.log("Args", execArgs);
     var child = execFile("process_video.exe", 
                         execArgs, 
                         {cwd : processDir});

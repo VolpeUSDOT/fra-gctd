@@ -5,14 +5,22 @@ $(document).ready(function() {
     if (!cpuMode)
         cpuMode = "cpu";
     document.getElementById(cpuMode).checked = true;
+    var skimMode = urlParams.get("skimMode");
+    if (skimMode === undefined)
+        skimMode = true;
+    document.getElementById("skim").checked = skimMode == "true";
 });
 
 document.querySelector("#outputBrowseBtn").addEventListener('click', function(evt) {
     window.selectOutputDir();
 });
 
-$('input[type=radio][name=cpuMode]').change(function() {
+$('input[type=radio][name=cpuMode]').change(() => {
     window.setCpuMode(this.value);
+});
+
+$("#skim").change(() => {
+    window.setSkimMode($("#skim").prop("checked"));
 });
 
 window.ipcRenderer.on('output-dir-updated', function(event, arg) {

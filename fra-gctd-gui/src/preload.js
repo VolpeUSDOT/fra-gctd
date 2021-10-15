@@ -12,6 +12,10 @@ window.setCpuMode = (mode) => {
     return ipcRenderer.send('update-cpu-mode', mode);
 };
 
+window.setSkimMode = (active) => {
+    return ipcRenderer.send('update-skim-mode', active);
+};
+
 window.sendFilePaths = (paths) => {
     arg = {};
     arg.paths = paths;

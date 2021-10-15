@@ -24,7 +24,8 @@ const createWindow = () => {
   mainWindow.loadFile(path.join(__dirname, 'index.html'), 
                       {query: {
                         "outputDir": global.settings.get("outputDir"),
-                        "cpuMode": global.settings.get("cpuMode")
+                        "cpuMode": global.settings.get("cpuMode"),
+                        "skimMode": global.settings.get("skimMode")
                       }});
   mainWindow.webContents.openDevTools();
   Menu.setApplicationMenu(null);
@@ -67,9 +68,13 @@ ipcMain.on('open-output-browser', (event) => {
 });
 
 ipcMain.on('update-cpu-mode', (event, mode) => {
-  if (mode !== undefined) {
+  if (mode !== undefined)
     global.settings.set("cpuMode", mode);
-  }
+});
+
+ipcMain.on('update-skim-mode', (event, active) => {
+  if (active !== undefined)
+    global.settings.set("skimMode", active);
 });
 
 // In this file you can include the rest of your app's specific main process

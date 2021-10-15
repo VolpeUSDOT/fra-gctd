@@ -105,6 +105,7 @@ if __name__ == '__main__':
     parser.add_argument('--outputpath', '-o',   action='store',         required=False,     default='../../temp/fraoutput',         help='Path to the directory where extracted data is stored.')
     parser.add_argument('--inputpath',  '-i',   action='store',         required=False,     default='/mnt/ml_data/FRA/sourcevideos/Other/16465283-427E-4A87-8329-AE77087BA33A.MP4',    help='Path to the extracted video frames in JPG format.')
     parser.add_argument('--cpu',        '-c',   action='store_true',    required=False,     default=False,                           help='Toggles CPU-only mode.')
+    parser.add_argument('--skim',       '-s',   action='store_true',    required=False,     default=False,                           help='Toggles grade crossing activation skimming')
     parser.add_argument('--force',      '-f',   action='store_true',    required=False,     default=False,                           help='Force object-based trespass detection on.')
 
     args = parser.parse_args()
@@ -271,7 +272,7 @@ if __name__ == '__main__':
     grade_segmented = False
     framecount = 0
     extracted_data = []
-    videoskim = True
+    videoskim = args.skim
     scn_event = False
     
     for chunk in range(video_clips.num_clips()):
