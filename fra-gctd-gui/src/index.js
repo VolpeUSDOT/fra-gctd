@@ -27,7 +27,6 @@ const createWindow = () => {
                         "cpuMode": global.settings.get("cpuMode"),
                         "skimMode": global.settings.get("skimMode")
                       }});
-  mainWindow.webContents.openDevTools();
   Menu.setApplicationMenu(null);
 };
 
