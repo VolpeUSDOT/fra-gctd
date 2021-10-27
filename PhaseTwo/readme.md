@@ -14,18 +14,27 @@ This repository is home to the python scripts used to perform the trespass detec
 
 ## Installation
 
-Installation instructions are coming soon...
+Download or clone this directory from Git. Ensure the required dependancies are installed in your python enviornment. A full list of dependancies may be found in 'requirements.txt'.
 
-## Usage Examples
+Next, download the required models from (URL to be determined) and save thime to '/PhaseTwo/models'.
 
-Useful FFMPEG frame extraction commands
+## Usage
+
+The script may be run with the following command:
+
 ```
-ffmpeg -i I:\projects\temp\fravideos\KALK0090_20130307133638.asf -qscale:v 2 I:\projects\temp\fraframes\KALK0090_20130307133638_%05d.jpg
+python process_video.py -i /path/to/your/video/file.mp4 -o /path/to/your/output/directory
 ```
-Generate video
-```
-ffmpeg -i fraoutput\frame_%05d.jpg -c:v libx264 -vf "fps=15,format=yuv420p,scale=w=900:h=-1:force_original_aspect_ratio=decrease,pad='iw+mod(iw\,2)':'ih+mod(ih\,2)'" FRA_GCTD_demo1.mp4
-```
+
+A full list of options may be found below.
+
+Flag | Short Flag | Properties | Description
+:------:|:---------------:|:---------------------:|:-----------:
+--inputpath|-i|type=string|Path to the video file you wish to process
+--outputpath|-o|type=string|Path to the directory where extracted data is stored.
+--cpu|-c|action='store_true'|Process using only CPU. Use this flag if your system does not include an NVIDIA GPU, or have CUDA toolkit installed
+--skim|-s|taction='store_true'|Skim videos for grade crossing activations, and begin object detection only when an activation is found. Reduces time required for inference, though may not be desireable in all use cases.
+
 
 ## License
 

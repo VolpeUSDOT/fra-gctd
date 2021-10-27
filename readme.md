@@ -6,6 +6,8 @@ This repository is home to the python scripts used to perform the trespass detec
 
 **/PhaseTwo**   *Phase two inference tools built using PyTorch 1.x*
 
+**/fra-gctd-gui** *Desktop GUI to use alongside phase two inference tools. Built using Electron.
+
 ## Requirements
 
 - Python 3.x (Tested on 3.7.x)
@@ -14,7 +16,7 @@ This repository is home to the python scripts used to perform the trespass detec
 
 ## Installation
 
-Installation instructions are coming soon...
+Installation instructions for each component may be found in the relevant folder.
 
 ## License
 
