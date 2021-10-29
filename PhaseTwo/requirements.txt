@@ -1,4 +1,7 @@
-numpy
-pathlib
+pytorch - https://pytorch.org/
+scipy
+av
+opencv-python
 hurry.filesize
-yaml
+scikit-image
+filterpy
