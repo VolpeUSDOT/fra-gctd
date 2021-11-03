@@ -302,7 +302,7 @@ def parse_grade_seg_prediction(pred, threshold, CATEGORY_NAMES):
     if len(pred['masks']) > 1:
         masks = (pred['masks']>0.5).squeeze().detach().cpu().numpy()
     else:
-        masks.append(pred['masks'][0][0].detach().cpu().numpy())
+        masks.append((pred['masks'][0][0]>0.5).detach().cpu().numpy())
     
     pred_class = [CATEGORY_NAMES[i] for i in list(pred['labels'].cpu().numpy())]
     pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred['boxes'].detach().cpu().numpy())]
@@ -327,7 +327,7 @@ def parse_grade_seg_prediction(pred, threshold, CATEGORY_NAMES):
 def instance_grade_segmentation_visualize(img, predictions, CATEGORY_NAMES, LABEL_COLORS, threshold=0.00001, rect_th=3, text_size=1, text_th=2):
     masks, boxes, pred_cls = parse_grade_seg_prediction(predictions, threshold, CATEGORY_NAMES)
     for i in range(len(masks)):
-        rgb_mask = colour_masks(masks[i], LABEL_COLORS[i])
+        rgb_mask = colour_masks(masks[i], LABEL_COLORS[pred_cls[i]])
         # rgb_mask = rgb_mask.transpose(2,0,1)
         img = cv2.addWeighted(img, 1, rgb_mask, .02, 0)
         # cv2.rectangle(img, boxes[i][0], boxes[i][1],color=(0, 255, 0), thickness=rect_th)

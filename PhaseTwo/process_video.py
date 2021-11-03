@@ -67,7 +67,8 @@ GRADE_CATEGORY_NAMES = [
     '__background__', 'GradeCrossing', 'RightOfWay'
 ]
 SCENE_LABEL_NAMES = ["activation","noactivation"]
-GRADE_LABEL_COLORS = [[0, 0, 255],[0, 255, 0],[255, 0, 0],[0, 255, 255],[255, 255, 0],[255, 0, 255],[80, 70, 180]]
+# GRADE_LABEL_COLORS = [[0, 0, 255],[0, 255, 0],[255, 0, 0],[0, 255, 255],[255, 255, 0],[255, 0, 255],[80, 70, 180]]
+GRADE_LABEL_COLORS = {"GradeCrossing":[0, 0, 255],"RightOfWay":[0, 255, 0]}
 
 # Roadway features model settings
 COCO_INSTANCE_VISIBLE_CATEGORY_NAMES = [
@@ -215,9 +216,9 @@ if __name__ == '__main__':
 
     # load the scene classification model
     if(device != 'cpu'):
-        model_scene = torch.load('models/saved_model_squeezenet.pt')
+        model_scene = torch.load('models/activation_model_squeezenet.pt')
     else: 
-        model_scene = torch.load('models/saved_model_squeezenet.pt', map_location=torch.device('cpu'))
+        model_scene = torch.load('models/activation_model_squeezenet.pt', map_location=torch.device('cpu'))
     model_scene = model_scene.to(device)
     model_scene.eval()
 
