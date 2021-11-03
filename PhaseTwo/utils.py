@@ -39,6 +39,8 @@ COCO_INSTANCE_CATEGORY_NAMES = [
     'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
 ]
 
+IN_AREA_THRESHOLD = 0.001
+
 def is_in_area(detections, threshold=0.001):
     for detection in detections:
         if(detection[2] >= threshold):
@@ -240,8 +242,7 @@ def get_event_detections(masks, boxes, detection_masks, detection_masks_labels, 
                 detection = detection_masks_labels[detection_index], classname, dice_metric(masks[i],detection_zone)
                 detection_zones_scores.append(detection)
                 detection_index += 1
-            all_events[i] = is_in_area(detection_zones_scores, 0.01)
-            #print("ID is " + str(sort_boxes[i][4]))
+            all_events[i] = is_in_area(detection_zones_scores, IN_AREA_THRESHOLD)
             if all_events[i]:
                 object_id = -1
                 for j in range(len(sort_boxes)):

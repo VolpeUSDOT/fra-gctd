@@ -441,18 +441,21 @@ if __name__ == '__main__':
     if activated:
         currentAct['end'] = video_timestamp
         activationGroups.append(currentAct)
+
     dataoutput.write('\n]')
     dataoutput.flush()
     dataoutput.close()
 
+    
     # Clean activation events by removing those shorter than our threshold
     # False positives tend to be very short
+    toRemove = []
     for activ in activationGroups:
         delta = activ["end"] - activ["start"]
         if (delta.seconds < activation_min_len_seconds):
-            activationGroups.remove(activ)
-
-    
+            toRemove.append(activ)
+    for r in toRemove:
+        activationGroups.remove(r)  
 
     # Output Events
     # Find any trains
@@ -533,7 +536,7 @@ if __name__ == '__main__':
                     activationIncluded = True
         if not activationIncluded:
             row = create_event_row("N/A", "N/A", "N/A", "N/A", "N/A", 
-                                    str(act["start"]), str(activ["end"]), train_event)
+                                    str(act["start"]), str(act["end"]), train_event)
             event_writer.writerow(row)
 
     for event in rowEvents:
