@@ -47,7 +47,7 @@ sort_ios_threshold = .1
 boxes_thickness = 1
 boxes_text_size = 1
 boxes_text_thickness = 1
-batch_size = 32
+batch_size = 20
 num_of_workers = 4
 force_video_fps = 0
 force_video_width = None
@@ -66,9 +66,10 @@ grade_num_classes = 3
 GRADE_CATEGORY_NAMES = [
     '__background__', 'GradeCrossing', 'RightOfWay'
 ]
-SCENE_LABEL_NAMES = ["activation","noactivation"]
-# GRADE_LABEL_COLORS = [[0, 0, 255],[0, 255, 0],[255, 0, 0],[0, 255, 255],[255, 255, 0],[255, 0, 255],[80, 70, 180]]
 GRADE_LABEL_COLORS = {"GradeCrossing":[0, 0, 255],"RightOfWay":[0, 255, 0]}
+
+# Activation (scene) detection model settings
+SCENE_LABEL_NAMES = ["activation","noactivation"]
 
 # Roadway features model settings
 COCO_INSTANCE_VISIBLE_CATEGORY_NAMES = [
@@ -385,6 +386,7 @@ if __name__ == '__main__':
                     is_annotation = True
 
                 road_img = org_image1
+                road_img, grade_masks, grade_cls = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
 
                 # fix the colors..
                 # road_img = cv2.cvtColor(road_img, cv2.COLOR_BGR2RGB)
@@ -404,7 +406,7 @@ if __name__ == '__main__':
                                 collected_labels.append(road_labels[idx])
                                 collected_scores.append(road_scores[idx])
                             idx += 1
-                        road_img, grade_masks, grade_cls = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
+                        # road_img, grade_masks, grade_cls = instance_grade_segmentation_visualize(road_img, grade_annotations[0], GRADE_CATEGORY_NAMES, GRADE_LABEL_COLORS)
                         sort_boxes = update_sort(road_img, collected_boxes, collected_scores, sort_trackers, deep_sort_tracker, DEEPSORT_LABEL, classname=label)
                         event_detections = get_event_detections(collected_masks, collected_boxes, grade_masks,  grade_cls, sort_boxes, event_trackers, video_data["frame_timestamp_raw"], label)
                         road_img = instance_segmentation_visualize_sort(road_img, collected_masks, sort_boxes, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES, activated, classname=label)

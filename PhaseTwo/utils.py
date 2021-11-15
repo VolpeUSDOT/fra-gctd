@@ -330,7 +330,7 @@ def instance_grade_segmentation_visualize(img, predictions, CATEGORY_NAMES, LABE
     for i in range(len(masks)):
         rgb_mask = colour_masks(masks[i], LABEL_COLORS[pred_cls[i]])
         # rgb_mask = rgb_mask.transpose(2,0,1)
-        img = cv2.addWeighted(img, 1, rgb_mask, .02, 0)
+        img = cv2.addWeighted(img, 1, rgb_mask, .09, 0)
         # cv2.rectangle(img, boxes[i][0], boxes[i][1],color=(0, 255, 0), thickness=rect_th)
         # cv2.putText(img,pred_cls[i], boxes[i][0], cv2.FONT_HERSHEY_SIMPLEX, text_size, (0,255,0),thickness=text_th)
     return img, masks, pred_cls
