@@ -16,7 +16,7 @@ This repository is home to the python scripts used to perform the trespass detec
 
 ## Installation
 
-Installation instructions for each component may be found in the relevant folder.
+Installation instructions for each component may be found in the relevant folder within this repository.
 
 ## License
 
