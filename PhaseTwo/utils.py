@@ -7,7 +7,7 @@
 ## Copyright: Copyright 2021, Volpe National Transportation Systems Center
 ## Credits: 
 ## License: MIT
-## Version: 0.0.1
+## Version: 0.0.2
 ## Mmaintainer: Robert Rittmuller
 ## Email: robert.rittmuller@dot.gov
 ## Status: Active Development
@@ -16,6 +16,7 @@
 # import modules
 import cv2
 import csv
+import datetime
 import numpy as np
 from numpy.core.arrayprint import format_float_scientific
 import torchvision
@@ -99,6 +100,51 @@ def image_resize(org_width, org_height, width = None, height = None):
 def pil_to_cv(image):
     new_image = np.array(image)
     return new_image[:, :, ::-1].copy()
+
+def add_timestamp(image, frame_counter, timestamp, ifactivated, textcolor="red"):
+    """
+    Adds a frame counter and timestamp to the upper left corner of an image.
+
+    Args:
+        image (numpy.ndarray): The input image.
+        frame_counter (int): The current frame counter value.
+        timestamp (str): A string representing the current timestamp.
+
+    Returns:
+        numpy.ndarray: The modified image with the frame counter and timestamp added.
+    """
+    # Convert the frame counter and timestamp to strings
+    frame_str = str(frame_counter)
+    timestamp_str = str(timestamp)
+
+    # Draw the frame counter and timestamp on the image
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.5
+
+    # default text color = red
+    if(textcolor == "red"):
+        color = (0, 0, 255)
+    if(textcolor == "white"):
+        color = (255, 255, 255)
+    if(textcolor == "black"):
+        color = (0, 0, 0)
+    
+    thickness = 1
+    text = f'Activation: {ifactivated} | Frame: {frame_str} | Time: {timestamp_str}'
+    text_size, _ = cv2.getTextSize(text, font, font_scale, thickness)
+    cv2.putText(image, text, (10, text_size[1] + 10), font, font_scale, color, thickness, cv2.LINE_AA)
+
+    return image
+
+def get_timestamp(framecount, video_output_fps):
+    # generate a timestamp from the video metadata
+    if framecount == 0:
+        video_timestamp = 0
+    else:
+        video_timestamp = framecount / video_output_fps
+    
+    video_timestamp = datetime.timedelta(seconds=video_timestamp)
+    return video_timestamp
 
 def load_labels(filePath):
     label_file = open(filePath, 'r')

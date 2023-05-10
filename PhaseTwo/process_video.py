@@ -32,7 +32,7 @@ from pathlib import Path
 from hurry.filesize import size, si
 from sort import *
 from deep_sort import build_tracker
-from utils import get_event_detections, image_resize, pil_to_cv, parse_seg_prediction, instance_segmentation_visualize_sort, get_model_instance_segmentation, instance_grade_segmentation_visualize, detect_object_overlap, update_sort
+from utils import get_event_detections, image_resize, pil_to_cv, parse_seg_prediction, instance_segmentation_visualize_sort, get_model_instance_segmentation, instance_grade_segmentation_visualize, detect_object_overlap, update_sort, add_timestamp, get_timestamp
 
 # -------------------------------------------------------------
 # Configuration settings
@@ -104,11 +104,12 @@ if __name__ == '__main__':
 
     # Deal with command line arguments.
     parser = argparse.ArgumentParser(description='Process some video files using Machine Learning!')
-    parser.add_argument('--outputpath', '-o',   action='store',         required=False,     default='../../temp/fraoutput',         help='Path to the directory where extracted data is stored.')
-    parser.add_argument('--inputpath',  '-i',   action='store',         required=False,     default='/mnt/ml_data/FRA/sourcevideos/Other/16465283-427E-4A87-8329-AE77087BA33A.MP4',    help='Path to the video file you wish to process')
-    parser.add_argument('--cpu',        '-c',   action='store_true',    required=False,     default=False,                           help='Toggles CPU-only mode.')
-    parser.add_argument('--skim',       '-s',   action='store_true',    required=False,     default=False,                           help='Toggles grade crossing activation skimming')
-    parser.add_argument('--force',      '-f',   action='store_true',    required=False,     default=False,                           help='Force object-based trespass detection on.')
+    parser.add_argument('--outputpath', '-o',   action='store',         required=False,     default='../output',    help='Path to the directory where extracted data is stored.')
+    parser.add_argument('--inputpath',  '-i',   action='store',         required=False,     default='../input',     help='Path to the video file you wish to process')
+    parser.add_argument('--cpu',        '-c',   action='store_true',    required=False,     default=False,          help='Toggles CPU-only mode.')
+    parser.add_argument('--skim',       '-s',   action='store_true',    required=False,     default=False,          help='Toggles grade crossing activation skimming')
+    parser.add_argument('--force',      '-f',   action='store_true',    required=False,     default=False,          help='Force object-based trespass detection on.')
+    parser.add_argument('--textcolor',  '-tc',  action='store',         required=False,     default="red",          help='Change the color of the frame counter & timestamp.')
 
     args = parser.parse_args()
 
@@ -365,11 +366,7 @@ if __name__ == '__main__':
             
             for road_annotation in road_annotations:
                 # get timestamps for each frame
-                if framecount == 0:
-                    video_timestamp = 0
-                else:
-                    video_timestamp = framecount / video_output_fps
-                video_timestamp = datetime.timedelta(seconds=video_timestamp)
+                video_timestamp = get_timestamp(framecount, video_output_fps)
                 
                 video_data = {}
                 video_data["frame_number"] = str(framecount)
@@ -412,6 +409,12 @@ if __name__ == '__main__':
                         road_img = instance_segmentation_visualize_sort(road_img, collected_masks, sort_boxes, collected_boxes, collected_labels, collected_scores, COCO_INSTANCE_VISIBLE_CATEGORY_NAMES, event_detections, LABEL_COLORS, DEEPSORT_LABEL, sort_trackers, deep_sort_tracker, grade_masks, GRADE_CATEGORY_NAMES, activated, classname=label)
                         new_line = [collected_boxes]
                         boxes_by_label[label] = new_line
+                
+                # get timestamp
+                this_frame_timestamp = get_timestamp(framecount, video_output_fps)
+
+                # add the timestamp to the video frame
+                road_img = add_timestamp(road_img, framecount, this_frame_timestamp, activated, str(args.textcolor).lower())
                 
                 # save the video to disk
                 video_out.write(road_img)
