@@ -148,3 +148,7 @@ PhaseTwo/models
 temp
 
 .vs
+
+# Repository specific 
+*.avi
+output/
