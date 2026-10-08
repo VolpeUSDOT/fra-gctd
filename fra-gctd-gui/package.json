@@ -1,0 +1,28 @@
+{
+  "name": "fra-gctd-gui",
+  "productName": "FRA Grade Crossing Trespass Detection",
+  "version": "0.0.14",
+  "description": "Desktop interface for FRA grade crossing trespass detection",
+  "private": true,
+  "license": "MIT",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "test:electron": "node --test test/electron-smoke.cjs",
+    "test:package": "node --test test/packaged-smoke.cjs",
+    "package": "node scripts/package.mjs"
+  },
+  "dependencies": {
+    "bootstrap": "4.6.2",
+    "electron-squirrel-startup": "1.0.1"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.7.0",
+    "playwright-core": "1.64.0"
+  }
+}
