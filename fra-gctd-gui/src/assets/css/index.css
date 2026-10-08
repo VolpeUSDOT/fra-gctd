@@ -43,3 +43,25 @@ body {
   overflow:auto;
   height: 60vh;
 }
+
+[hidden] {
+  display: none !important;
+}
+
+#outputDir {
+  width: 50%;
+}
+
+#videoTable th {
+  position: sticky;
+}
+
+.fileControls {
+  position: absolute;
+  bottom: 20px;
+  width: 100%;
+}
+
+.license {
+  text-align: center;
+}

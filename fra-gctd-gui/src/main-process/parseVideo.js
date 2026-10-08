@@ -1,119 +1,123 @@
-const { dialog, ipcMain, app} = require('electron');
-const execFile = require("child_process").execFile;
+const { app } = require('electron');
+const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { createOutputDirectory } = require('./security');
 
-var videosToProcess = [];
-var videosProcessed = [];
+const resourceDir = app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), 'resources');
+const processDir = path.join(resourceDir, 'executables', 'process_video');
+const videosToProcess = [];
+const results = new Map();
+let videoInProcess = null;
 
-var videoInProcess = null;
+function send(sender, channel, data) {
+    if (!sender.isDestroyed())
+        sender.send(channel, data);
+}
 
-const processDir = app.getAppPath() + "\\resources\\executables\\process_video";
-
-exports.addVideo = addVideo;
-
-function addVideo(videoPath, videoId, sender) {
-    for (var video of videosToProcess) {
-        if (video.name === videoPath)
-            // The video is already in the queue; do nothing.
+function startNext() {
+    while ((videoInProcess = videosToProcess.shift() || null)) {
+        if (startProcess(videoInProcess))
             return;
-    }
-
-    var newVideo = {
-        name: path.basename(videoPath),
-        path: videoPath,
-        id: videoId,
-        sender: sender,
-        status: "Pending"
-    };
-
-    if (videoInProcess == null) {
-        startProcess(newVideo);
-    } else {
-        videosToProcess.push(newVideo);
     }
 }
 
 function startProcess(video) {
-    video.status = "Processing";
-    videoInProcess = video;
-    console.log("Processing video " + video.name);
-    var fileName = path.basename(video.path, path.extname(video.path));
-
-    var outputPath = path.join(global.settings.get("outputDir"), fileName);
-    console.log("OutputPath", outputPath);
-
-    var cpuMode = global.settings.get("cpuMode");
-    var skim = global.settings.get("skimMode");
-
-    if (!fs.existsSync(outputPath)){
-        fs.mkdirSync(outputPath);
+    let output;
+    let writeStream;
+    let child;
+    let failed = false;
+    let closed = false;
+    let flushed = false;
+    let finalized = false;
+    let exitCode;
+    let runtime;
+    function finalize() {
+        if (finalized || !closed || (!flushed && !failed))
+            return;
+        finalized = true;
+        if (exitCode === 0 && !failed) {
+            results.set(video.id, { sender: video.sender, root: output.root, path: output.path });
+            send(video.sender, 'status-updated', {
+                id: video.id, status: runtime ? 'Completed in ' + runtime : 'Complete'
+            });
+            send(video.sender, 'status-complete', { id: video.id });
+        } else if (!failed) {
+            send(video.sender, 'status-updated', { id: video.id, status: 'Process stopped unexpectedly' });
+        }
+        startNext();
     }
-    var logfile = path.join(outputPath, "process-log.txt");
-    let writeStream = fs.createWriteStream(logfile);
+    try {
+        const name = path.basename(video.path, path.extname(video.path));
+        output = createOutputDirectory(global.settings.get('outputDir'), name);
+        const logfile = path.join(output.path, 'process-log-' + video.id + '-' + Date.now() + '.txt');
+        writeStream = fs.createWriteStream(logfile, { flags: 'wx' });
+        writeStream.on('error', () => {
+            if (finalized)
+                return;
+            failed = true;
+            if (child)
+                child.kill();
+            send(video.sender, 'status-updated', { id: video.id, status: 'Unable to write the processing log' });
+            finalize();
+        });
+        writeStream.on('finish', () => { flushed = true; finalize(); });
+        const args = ['--inputpath', video.path, '--outputpath', output.path];
+        if (global.settings.get('cpuMode') !== 'gpu')
+            args.push('--cpu');
+        if (global.settings.get('skimMode'))
+            args.push('--skim');
+        child = execFile(path.join(processDir, 'process_video.exe'), args, { cwd: processDir });
+    } catch (error) {
+        finalized = true;
+        if (writeStream)
+            writeStream.end();
+        send(video.sender, 'status-updated', { id: video.id, status: 'Unable to start processing: ' + error.message });
+        return false;
+    }
 
-    var execArgs = ['--inputpath', video.path, '--outputpath', outputPath];
-    if (cpuMode !== "gpu")
-        execArgs.push("--cpu");
-    if (skim)
-        execArgs.push("--skim");
-    console.log("Args", execArgs);
-    var child = execFile("process_video.exe", 
-                        execArgs, 
-                        {cwd : processDir});
-
-    child.stdout.on('data', function(data) {
-        // Grab output from the script, and push completion percentage to the renderer
+    send(video.sender, 'status-updated', { id: video.id, status: 'Processing' });
+    let buffer = '';
+    child.on('error', () => {
+        failed = true;
+        send(video.sender, 'status-updated', { id: video.id, status: 'Unable to start the video processing executable' });
+    });
+    child.stdout.on('data', data => {
         writeStream.write(data);
-        if (data.match("Processing:.*\% complete"))
-            updateStatus(video.id, data.match("Processing:.*\% complete")[0], video.sender);
-        else if (data.match("Total running time: .*")) {
-            var msg = data.match("Total running time: .*")[0];
-            var runTime = msg.split("Total running time: ")[1];
-            updateStatus(video.id, "Completed in " + runTime, video.sender);
-            notifyComplete(video.id, outputPath, video.sender);
+        buffer += data.toString();
+        const lines = buffer.split(/[\r\n]/);
+        buffer = lines.pop().slice(-4096);
+        for (const line of lines) {
+            const progress = line.match(/Processing:.*% complete/);
+            const completed = line.match(/Total running time: (.*)/);
+            if (progress)
+                send(video.sender, 'status-updated', { id: video.id, status: progress[0] });
+            if (completed)
+                runtime = completed[1];
         }
     });
-
-    child.stderr.on('data', function(data) {
-        writeStream.write(data);
+    child.stderr.on('data', data => writeStream.write(data));
+    child.on('close', code => {
+        closed = true;
+        exitCode = code;
+        writeStream.end();
+        finalize();
     });
-
-    // When the process is complete, start the next one
-    child.on('close', function() {
-        writeStream.close();
-        console.log("Closed video " + video.name);
-        video.status = "Complete";
-        videosProcessed.push(video);
-        var nextVideo = videosToProcess.shift();
-        // If we're out of videos, do nothing
-        if (nextVideo == null)
-            videoInProcess = null;
-        else {
-            videoInProcess = nextVideo;
-            startProcess(nextVideo);
-        }
-    });
-
-    child.on('exit', function(code) {
-        writeStream.close();
-        if (code != 0)
-            updateStatus(video.id, "Process stopped unexpectedly", video.sender);
-    });
+    return true;
 }
 
-function updateStatus(id, status, sender) {
-    var args = {
-        id: id,
-        status: status
-    };
-    sender.send("status-updated", args);
-}
+exports.addVideo = (videoPath, id, sender) => {
+    if ((videoInProcess && videoInProcess.path === videoPath) ||
+        videosToProcess.some(video => video.path === videoPath)) {
+        send(sender, 'status-updated', { id, status: 'Already queued' });
+        return;
+    }
+    videosToProcess.push({ path: videoPath, id, sender });
+    if (!videoInProcess)
+        startNext();
+};
 
-function notifyComplete(id, outputDir, sender) {
-    var args = {
-        id: id,
-        output: outputDir
-    };
-    sender.send("status-complete", args);
-}
+exports.getResult = (id, sender) => {
+    const result = results.get(id);
+    return result && result.sender === sender ? result : undefined;
+};

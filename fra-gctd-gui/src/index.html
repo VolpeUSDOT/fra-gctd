@@ -2,17 +2,18 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>Grade Crossing Trespass Detection v0.0.13</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'">
+    <title>Grade Crossing Trespass Detection v0.0.14</title>
+    <link rel="stylesheet" href="../node_modules/bootstrap/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="assets/css/index.css">
   </head>
   <body>
-    <!--<div id="settings-menu" style="width:200px;float:left;border-right: 1px black solid;height:100vh;"></div>-->
-    <div id="page-container"> <!--style="margin-left:200px;"-->
+    <div id="page-container">
     <div id="header" class="header">
-      <img src="assets/img/fra-logo@2x.png" class="headerImage" />
+      <img src="assets/img/fra-logo@2x.png" class="headerImage" alt="Federal Railroad Administration" />
     </div>
     <div id="content" class="content">
+      <div id="errorMessage" class="alert alert-danger" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
       <div id="welcomeMessage" class="welcome">
         <h1>Welcome to the FRA Grade Crossing Trespass Detection Tool</h1>
         <p>To start, drop or browse to a video file, or a directory containing video files you want to analyze</p>
@@ -21,30 +22,30 @@
         <div>
           <div>
             <h4>Select your output directory:</h4>
-            <input style="width: 50%" id ="outputDir" disabled="true" type="text" value="" />
-            <button id="outputBrowseBtn">Browse</button>
+            <input id="outputDir" disabled type="text" value="" aria-label="Output directory" />
+            <button id="outputBrowseBtn" type="button" disabled>Browse</button>
           </div>
           <br />
           <div>
-            <input type="radio" id="cpu" name="cpuMode" value="cpu">
+            <input type="radio" id="cpu" name="cpuMode" value="cpu" disabled>
             <label for="cpu">CPU Only</label><br>
-            <input type="radio" id="gpu" name="cpuMode" value="gpu">
+            <input type="radio" id="gpu" name="cpuMode" value="gpu" disabled>
             <label for="gpu">Use GPU (Requires NVIDIA GPU and installation of NVIDIA CUDA)</label><br>
           </div>
           <br />
           <div>
-            <input type="checkbox" id="skim">
+            <input type="checkbox" id="skim" disabled>
             <label for="skim">Skim Videos for Grade Crossing Activations</label>
           </div>
         </div>
       </div>
-      <div id="videoList" class="videoList" style="display: none;">
+      <div id="videoList" class="videoList" hidden>
         <table class="table table-striped" id="videoTable">
           <thead>
             <tr>
-              <th style="position:sticky;" scope="col">Video Name</th>
-              <th style="position:sticky;" scope="col">Status</th>
-              <th style="position:sticky;" scope="col"></th>
+              <th scope="col">Video Name</th>
+              <th scope="col">Status</th>
+              <th scope="col"></th>
             </tr>
           </thead>
           <tbody id="videoTableBody">
@@ -52,21 +53,18 @@
           </tbody>
         </table>
       </div>
-      <div style="position: absolute; bottom: 20px; width: 100%">
+      <div class="fileControls">
       <div id="dropZone" class="dropzone">
         Drop a Video or Folder Here
         <br/>
         <a href="#" id="fileBrowser">Or Browse for a File</a>
       </div>
-      <p style="text-align: center;">This software application is available under the <a href="https://opensource.org/licenses/MIT">MIT License</a></p>
+      <p class="license">This software application is available under the <a href="https://opensource.org/licenses/MIT" id="licenseLink">MIT License</a></p>
       </div>
     </div>
   </div>
-  </body>
-  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+  <script type="text/javascript" src="./render-process/updatelist.js"></script>
   <script type="text/javascript" src="./render-process/settings.js"></script>
   <script type="text/javascript" src="./render-process/selectfile.js"></script>
-  <script type="text/javascript" src="./render-process/updatelist.js"></script>
+  </body>
 </html>

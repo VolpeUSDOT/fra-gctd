@@ -91,3 +91,7 @@ out/
 # Executable directory
 src/assets/executables/*
 resources/executables/*
+
+# Track the GUI dependency definitions despite the root *.json rule.
+!package.json
+!package-lock.json
